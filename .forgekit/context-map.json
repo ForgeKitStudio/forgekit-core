@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "description": "Maps code file path patterns to anchor sections in CLAUDE.md / .cursorrules. The Git pre-commit hook (mcp-server/scripts/git-hooks/pre-commit.ts) reads this file and rejects commits whose code changes do not also update the matching context-file sections (CONTEXT_FILE_STALE, JSON-RPC error -32012). Anchors use the form '<relative-path>#<heading-slug>'.",
+  "mappings": [
+    {
+      "pattern": "addons/forgekit_core/event_bus/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#event-bus",
+        ".cursorrules#event-bus"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_core/resources/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#resources",
+        ".cursorrules#resources"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_core/manifest/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#manifest",
+        ".cursorrules#manifest"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_core/mcp/editor_plugin/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#mcp-editor-plugin",
+        ".cursorrules#mcp-editor-plugin"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_core/mcp/runtime_bridge/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#mcp-runtime-bridge",
+        ".cursorrules#mcp-runtime-bridge"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_core/mcp/licensing/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#mcp-licensing",
+        ".cursorrules#mcp-licensing"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_core/boundary/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#core-boundary",
+        ".cursorrules#core-boundary"
+      ]
+    },
+    {
+      "pattern": "mcp-server/src/**/*.ts",
+      "anchors": [
+        "CLAUDE.md#mcp-server",
+        ".cursorrules#mcp-server"
+      ]
+    },
+    {
+      "pattern": "mcp-server/scripts/git-hooks/**/*.ts",
+      "anchors": [
+        "CLAUDE.md#git-hooks",
+        ".cursorrules#git-hooks"
+      ]
+    },
+    {
+      "pattern": "addons/forgekit_rpg/**/*.gd",
+      "anchors": [
+        "CLAUDE.md#forgekit-rpg",
+        ".cursorrules#forgekit-rpg"
+      ]
+    }
+  ]
+}

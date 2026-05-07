@@ -1,0 +1,102 @@
+{
+  "version": "0.1.0",
+  "description": "Skeleton tool profile definitions for @forgekit/core-mcp. Populated with a representative subset of tools; the full 215-tool surface is added in later phases.",
+  "tools": [
+    {
+      "name": "project.info",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.list_modules",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.open",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "node.add",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.set_property",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "input.simulate_action",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core-minimal"
+    },
+    {
+      "name": "input.simulate_key",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "input.simulate_mouse_button",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "input.simulate_mouse_motion",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "input.list_actions",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "input.configure_action",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "input.remove_action",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "combat.list_hitboxes",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "combat"
+    },
+    {
+      "name": "crafting.execute",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "inventory.add_item",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "stats.get_stat",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "stats"
+    }
+  ]
+}

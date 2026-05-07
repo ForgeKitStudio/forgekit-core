@@ -1,0 +1,23 @@
+ForgeKit RPG Module — placeholder directory
+============================================
+
+This directory is reserved for the paid **ForgeKit RPG Module**. It is empty
+on purpose so that the ForgeKit Core template starts without errors even when
+the module is not installed.
+
+To install the module:
+
+1. Purchase ForgeKit RPG Module from one of the official stores:
+   - itch.io:  https://forgekitstudio.itch.io/forgekit-rpg
+   - Gumroad:  https://forgekitstudio.gumroad.com/l/forgekit-rpg
+2. Download the distribution ZIP and unzip its contents directly into this
+   directory (`addons/forgekit_rpg/`). After extraction you should see
+   subdirectories such as `combat/`, `crafting/`, `inventory/`, `stats/`
+   alongside `public_api.gd` and `module.manifest.tres`.
+3. Activate your license by calling the MCP tool:
+     `modules.activate_license("forgekit_rpg", "<your-license-key>")`
+4. Restart the MCP server or call `project.reload` to unlock the RPG
+   subsystems (Combat, Crafting, Inventory, Stats).
+
+Do not delete this file. Git keeps empty directories only when at least one
+tracked file lives inside them.

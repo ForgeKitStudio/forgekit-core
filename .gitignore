@@ -1,0 +1,24 @@
+# ForgeKit MCP runtime secrets — auth tokens must never be committed.
+# Only the *.tres.template files are tracked; copy them locally and fill in values.
+addons/forgekit_core/mcp/plugin_config.tres
+addons/forgekit_core/mcp/runtime_config.tres
+
+# Godot user-scope data (logs, active port file, license keys, save files).
+# Godot actually resolves `user://` to OS-specific directories, but keep this
+# literal pattern per spec so the intent is documented in the repository.
+user://*
+
+# Godot editor cache.
+.godot/
+*.import.generated
+
+# Node.js / MCP server build artifacts.
+node_modules/
+mcp-server/dist/
+
+# Generated validator output — not part of the source tree.
+language-policy-violations.json
+
+# Third-party test framework installed manually by each contributor.
+# Not vendored to keep the public template slim and avoid licence bundling.
+addons/gut/

@@ -1,0 +1,8 @@
+* text=auto
+
+*.gd text eol=lf
+*.tres text eol=lf
+*.tscn text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.yml text eol=lf

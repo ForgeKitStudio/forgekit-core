@@ -1,0 +1,16 @@
+; Engine configuration file.
+; Generated from the ForgeKit Core template. Autoload stubs are placeholders;
+; real implementations land in Phase 1 (Event Bus) and Phase 3 (MCP runtime bridge).
+
+config_version=5
+
+[application]
+
+config/name="ForgeKit Core Template"
+config/description="ForgeKit Core — modular AI-native starter kit for Godot 4.x"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+
+GameEvents="*res://addons/forgekit_core/event_bus/game_events.gd"
+McpBridge="*res://addons/forgekit_core/mcp/runtime_bridge/mcp_bridge.gd"

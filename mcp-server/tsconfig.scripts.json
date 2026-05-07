@@ -1,0 +1,25 @@
+{
+  // Build configuration that widens the root directory to the package root
+  // so `scripts/git-hooks/*.ts` and `scripts/ci/*.ts` emit to
+  // `dist/scripts/git-hooks/*.js` and `dist/scripts/ci/*.js` next to the
+  // main `dist/index.js`. Kept separate from `tsconfig.json` to preserve
+  // the IDE's focused view of `src/` while still producing everything
+  // the package ships.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./",
+    "outDir": "./dist"
+  },
+  "include": [
+    "src/**/*",
+    "scripts/git-hooks/**/*",
+    "scripts/ci/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "test",
+    "scripts/git-hooks/**/*.test.ts",
+    "scripts/ci/**/*.test.ts"
+  ]
+}

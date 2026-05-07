@@ -1,0 +1,7 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[resource]
+auth_token = ""
+bind_address = "127.0.0.1"
+port = 6010
+log_level = "info"

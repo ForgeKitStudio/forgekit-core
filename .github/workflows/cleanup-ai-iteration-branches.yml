@@ -1,0 +1,206 @@
+# ForgeKit Core — AI iteration branch cleanup
+#
+# Experimental branches created by the LLM agent under the
+# `feature/ai-iteration/*` prefix are short-lived by design: force-push is
+# allowed, review is not required, and they are expected to be garbage
+# collected once the work they host has been promoted to a stable
+# `feature/<topic>` branch (or simply abandoned). This workflow enforces
+# that lifecycle by deleting matching branches whose tip commit is older
+# than 30 days.
+#
+# The cron runs every day at 03:17 UTC — an off-peak slot chosen so the
+# cleanup does not compete with the main CI pipeline. The workflow can
+# also be triggered manually from the Actions UI, which is convenient
+# both for ad-hoc cleanups and for dry-run inspections: set the
+# `dry_run` input to `true` to list the branches that would be deleted
+# without actually removing them.
+#
+# Branch protection for `main` and `feature/*` (non-`ai-iteration`)
+# branches is unaffected by this workflow because the matching-refs
+# query is anchored to `heads/feature/ai-iteration/`.
+
+name: cleanup-ai-iteration-branches
+
+on:
+  schedule:
+    # Daily at 03:17 UTC. Times slightly off the hour reduce the chance
+    # of coinciding with other scheduled jobs on GitHub's shared runners.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List stale branches without deleting them"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      max_age_days:
+        description: "Delete branches older than this many days"
+        required: false
+        default: "30"
+        type: string
+
+# Only one cleanup run at a time per repository to avoid racing on the
+# same branch refs.
+concurrency:
+  group: cleanup-ai-iteration-branches
+  cancel-in-progress: false
+
+# The job needs write access to refs so it can delete branches.
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: cleanup
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BRANCH_PREFIX: "feature/ai-iteration/"
+      # Default to 30 days when the workflow runs on schedule (no inputs).
+      # The `workflow_dispatch` branch below overrides this with the
+      # user-supplied value.
+      MAX_AGE_DAYS: "30"
+      DRY_RUN: "false"
+    steps:
+      - name: Resolve inputs
+        # `workflow_dispatch` inputs are only present when the workflow
+        # is triggered manually. Fall back to the scheduled defaults
+        # otherwise. Keeping this resolution in its own step makes the
+        # actual cleanup step read the same two environment variables
+        # regardless of trigger.
+        shell: bash
+        run: |
+          set -euo pipefail
+          dry_run="${{ github.event.inputs.dry_run }}"
+          max_age="${{ github.event.inputs.max_age_days }}"
+          if [ -n "${dry_run}" ]; then
+            echo "DRY_RUN=${dry_run}" >> "${GITHUB_ENV}"
+          fi
+          if [ -n "${max_age}" ]; then
+            echo "MAX_AGE_DAYS=${max_age}" >> "${GITHUB_ENV}"
+          fi
+          echo "Resolved: dry_run=${dry_run:-false} max_age_days=${max_age:-30}"
+
+      - name: Delete stale ai-iteration branches
+        # Lists every ref under `refs/heads/feature/ai-iteration/` via the
+        # GitHub REST API, inspects each tip commit's author date, and
+        # deletes the branch when the commit is older than the age
+        # threshold. In dry-run mode the branches that would be deleted
+        # are printed to stdout and the job still exits cleanly.
+        #
+        # Error handling:
+        #   * An empty matching-refs response (no experimental branches)
+        #     is treated as success.
+        #   * Per-branch failures (missing commit metadata, 404 on
+        #     delete, transient network errors) are logged as warnings
+        #     and do not abort the cleanup of the remaining branches.
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+          prefix="${BRANCH_PREFIX}"
+          max_age_days="${MAX_AGE_DAYS}"
+          dry_run="${DRY_RUN}"
+
+          # Normalise the dry-run flag so any truthy value is accepted.
+          case "${dry_run,,}" in
+            true|yes|1|on) dry_run="true" ;;
+            *)             dry_run="false" ;;
+          esac
+
+          # Cut-off timestamp expressed as Unix epoch seconds.
+          cutoff_epoch="$(date -u -d "${max_age_days} days ago" +%s)"
+          cutoff_iso="$(date -u -d "@${cutoff_epoch}" +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "Repository        : ${owner}/${repo}"
+          echo "Branch prefix     : ${prefix}"
+          echo "Max age (days)    : ${max_age_days}"
+          echo "Cutoff (UTC)      : ${cutoff_iso}"
+          echo "Dry run           : ${dry_run}"
+          echo
+
+          # `git/matching-refs` returns every ref under the given
+          # namespace in a single paginated response. The `--paginate`
+          # flag transparently concatenates pages so long lists are
+          # handled correctly.
+          refs_json="$(gh api \
+            --paginate \
+            "repos/${owner}/${repo}/git/matching-refs/heads/${prefix}" \
+            2>/dev/null || echo "[]")"
+
+          ref_count="$(jq 'length' <<< "${refs_json}")"
+          echo "Matching branches : ${ref_count}"
+          if [ "${ref_count}" -eq 0 ]; then
+            echo "Nothing to clean up."
+            exit 0
+          fi
+
+          deleted=0
+          kept=0
+          failed=0
+
+          while IFS=$'\t' read -r ref sha; do
+            branch="${ref#refs/heads/}"
+
+            # Guard against the API returning a ref outside the expected
+            # namespace (should not happen but keeps the loop safe).
+            case "${branch}" in
+              "${prefix}"*) ;;
+              *)
+                echo "skip: ${branch} is outside the ${prefix} namespace"
+                continue
+                ;;
+            esac
+
+            commit_date="$(gh api \
+              "repos/${owner}/${repo}/commits/${sha}" \
+              --jq '.commit.committer.date // .commit.author.date' \
+              2>/dev/null || true)"
+            if [ -z "${commit_date}" ] || [ "${commit_date}" = "null" ]; then
+              echo "warn: unable to resolve commit date for ${branch} (${sha:0:7}); skipping"
+              failed=$((failed + 1))
+              continue
+            fi
+
+            commit_epoch="$(date -u -d "${commit_date}" +%s 2>/dev/null || echo 0)"
+            if [ "${commit_epoch}" -eq 0 ]; then
+              echo "warn: unparseable commit date '${commit_date}' for ${branch}; skipping"
+              failed=$((failed + 1))
+              continue
+            fi
+
+            age_days=$(( (cutoff_epoch + max_age_days * 86400 - commit_epoch) / 86400 ))
+
+            if [ "${commit_epoch}" -lt "${cutoff_epoch}" ]; then
+              if [ "${dry_run}" = "true" ]; then
+                echo "would delete: ${branch} (age=${age_days}d, tip=${sha:0:7}, date=${commit_date})"
+                deleted=$((deleted + 1))
+              else
+                # `DELETE /git/refs/heads/<branch>` removes the ref. A
+                # 422 response typically means the branch was already
+                # deleted between the list and delete calls, which is
+                # safe to ignore.
+                if gh api \
+                  --method DELETE \
+                  "repos/${owner}/${repo}/git/refs/heads/${branch}" \
+                  >/dev/null 2>&1; then
+                  echo "deleted     : ${branch} (age=${age_days}d, tip=${sha:0:7}, date=${commit_date})"
+                  deleted=$((deleted + 1))
+                else
+                  echo "warn: failed to delete ${branch}; it may have been removed already"
+                  failed=$((failed + 1))
+                fi
+              fi
+            else
+              echo "kept        : ${branch} (age=${age_days}d, tip=${sha:0:7}, date=${commit_date})"
+              kept=$((kept + 1))
+            fi
+          done < <(jq -r '.[] | [.ref, .object.sha] | @tsv' <<< "${refs_json}")
+
+          echo
+          echo "Summary: deleted=${deleted} kept=${kept} failed=${failed} dry_run=${dry_run}"

@@ -1,0 +1,277 @@
+# ForgeKit Core — Continuous Integration
+#
+# Required status checks for the protected `main` branch (configured in the
+# GitHub repository settings → Branches → Branch protection rules):
+#   - ci / tests-unit
+#   - ci / tests-property
+#   - ci / tests-gameplay
+#   - ci / check-imports
+#   - ci / language-policy
+#   - ci / check-pr-template
+#
+# The six jobs below are intentionally named to match these required checks.
+# Some steps are phase-0 placeholders that degrade gracefully when their
+# target scripts are not yet present in the repository. The fallback
+# branches will be removed in later phases as soon as the referenced
+# scripts land.
+
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.3.0"
+
+jobs:
+  # -------------------------------------------------------------------------
+  # GUT unit tests executed against a headless Godot 4.3+ engine.
+  # -------------------------------------------------------------------------
+  tests-unit:
+    name: tests-unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Run GUT unit tests
+        # Phase 0: the `tests/unit/` directory and the bundled GUT addon may
+        # not yet exist. In that case we emit a placeholder green result and
+        # keep the job passing. As soon as both exist, GUT runs for real and
+        # any failing test turns this job red (non-zero exit code).
+        #
+        # TODO(phase-1): drop the placeholder branch once `addons/gut/` and
+        # `tests/unit/` are committed.
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d "tests/unit" ] && [ -f "addons/gut/gut_cmdln.gd" ]; then
+            godot --headless --script addons/gut/gut_cmdln.gd -gdir=tests/unit
+          else
+            echo "placeholder — GUT unit test suite not yet present (phase 0)"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Property-based tests: fast-check (TypeScript + Vitest) for the MCP server
+  # and CoreFuzz (GDScript + GUT) for the Godot addons. Minimum of 100
+  # iterations per property is enforced inside the tests themselves.
+  # -------------------------------------------------------------------------
+  tests-property:
+    name: tests-property
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install MCP server dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Run fast-check property tests (Vitest)
+        # Vitest propagates the exit code from the fast-check runner, so a
+        # failing property surfaces its counterexample in stderr and turns
+        # the job red.
+        working-directory: mcp-server
+        run: npm test
+
+      - name: Run CoreFuzz property tests (GUT)
+        # Phase 0: `tests/property/` and the GUT addon may not exist yet.
+        # Fall back to a green placeholder until both land.
+        #
+        # TODO(phase-1): drop the placeholder branch once CoreFuzz suites
+        # are committed under `tests/property/`.
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d "tests/property" ] && [ -f "addons/gut/gut_cmdln.gd" ]; then
+            godot --headless --script addons/gut/gut_cmdln.gd -gdir=tests/property
+          else
+            echo "placeholder — CoreFuzz property suite not yet present (phase 0)"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Gameplay scenario tests driven by the MCP bridge in headless Godot.
+  # -------------------------------------------------------------------------
+  tests-gameplay:
+    name: tests-gameplay
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Run Gameplay Test Runner scenarios
+        # Phase 0: no scenarios exist under `tests/integration/scenes/` yet.
+        # Emit a placeholder green result. Once scenarios exist, iterate
+        # over each `.tscn` and run it through the MCP bridge runner; any
+        # non-zero exit fails the job.
+        #
+        # TODO(phase-1): replace the placeholder with the real scenario
+        # loop driven by `godot --headless --mcp-bridge --scene=<scenario>`.
+        shell: bash
+        run: |
+          set -euo pipefail
+          scenario_dir="tests/integration/scenes"
+          if [ -d "$scenario_dir" ] && compgen -G "$scenario_dir/*.tscn" > /dev/null; then
+            for scenario in "$scenario_dir"/*.tscn; do
+              echo "Running gameplay scenario: $scenario"
+              godot --headless --mcp-bridge --scene="$scenario"
+            done
+          else
+            echo "placeholder — gameplay scenarios not yet present (phase 0)"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Core boundary / import-rule validator. Delegates to the CLI wrapper
+  # which invokes `project.check_imports` through the MCP server.
+  # -------------------------------------------------------------------------
+  check-imports:
+    name: check-imports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Run project.check_imports
+        # Phase 0: the CLI wrapper script does not yet exist (added in a
+        # later task). Emit a green placeholder until it lands so that the
+        # required status check is still reported.
+        #
+        # TODO(phase-1): remove the placeholder once
+        # `tools/cli_runner/check_imports.sh` is committed.
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="tools/cli_runner/check_imports.sh"
+          if [ -x "$script" ]; then
+            "$script"
+          elif [ -f "$script" ]; then
+            bash "$script"
+          else
+            echo "placeholder — $script not yet present (phase 0)"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Language policy validator — ensures the public repository content is in
+  # English (Markdown, GDScript, TypeScript, comments, commit messages, and
+  # file names).
+  # -------------------------------------------------------------------------
+  language-policy:
+    name: language-policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch the full history so the validator can inspect commit
+          # messages when it lands in a later phase.
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate language policy
+        # Phase 0: the validator script does not yet exist (added in a
+        # later task). Emit a green placeholder until it lands.
+        #
+        # TODO(phase-1): remove the placeholder once
+        # `tools/validate-language-policy.js` is committed.
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="tools/validate-language-policy.js"
+          if [ -f "$script" ]; then
+            node "$script"
+          else
+            echo "placeholder — $script not yet present (phase 0)"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Pull request template completeness check. Only runs for pull requests;
+  # fails with the `-32014 PR_TEMPLATE_INCOMPLETE` error code when any of
+  # the four required sections is empty.
+  # -------------------------------------------------------------------------
+  check-pr-template:
+    name: check-pr-template
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Validate pull request description
+        # Phase 0: the validator script does not yet exist (added in a
+        # later task). Emit a green placeholder until it lands. The real
+        # step will pipe the PR body on stdin and fail with exit code
+        # matching JSON-RPC error `-32014 PR_TEMPLATE_INCOMPLETE` when any
+        # of the four mandatory sections is empty.
+        #
+        # TODO(phase-1): remove the placeholder once
+        # `mcp-server/scripts/ci/check-pr-template.js` is committed.
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="mcp-server/scripts/ci/check-pr-template.js"
+          if [ -f "$script" ]; then
+            printf '%s' "${PR_BODY:-}" | node "$script"
+          else
+            echo "placeholder — $script not yet present (phase 0)"
+          fi

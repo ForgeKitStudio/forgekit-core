@@ -1,0 +1,3 @@
+# Git hook scripts. Populated by task 0.6 (commit-msg.ts, pre-commit.ts,
+# install.ts) — cross-platform Node.js hooks enforcing Conventional Commits
+# and Context Commits policies.
