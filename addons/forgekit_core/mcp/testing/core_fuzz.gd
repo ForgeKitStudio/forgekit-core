@@ -184,6 +184,54 @@ static func random_recipe_resource(rng: RandomNumberGenerator) -> RecipeResource
 	return recipe
 
 
+## Upper bound for the random amounts produced by
+## random_inventory_operations. Large enough to cover multi-digit
+## accumulation across repeat add_item calls to the same item_id,
+## small enough that a counterexample's sum fits on one log line.
+const DEFAULT_MAX_INVENTORY_AMOUNT: int = 100
+
+## Size of the item_id pool drawn from by random_inventory_operations.
+## Reusing a small pool of ids guarantees that across a sequence of
+## 1..20 operations at least a few ids will repeat, so Property 16
+## genuinely exercises per-id accumulation (not just trivial singletons).
+const DEFAULT_INVENTORY_ID_POOL_SIZE: int = 5
+
+
+## Returns a typed Array[Dictionary] of `count` random inventory
+## operations of the shape `{item_id: StringName, amount: int}` with
+## `amount >= 1`. `count` is clamped to [`min_ops`, `max_ops`]
+## inclusive; passing a reversed range collapses to `min_ops`.
+##
+## The item_id pool is drawn up front from random_string_name and then
+## reused across the whole sequence so that commutativity / associativity
+## properties can be exercised with repeated ids per sequence rather
+## than with a stream of unique singletons.
+static func random_inventory_operations(
+		rng: RandomNumberGenerator,
+		min_ops: int,
+		max_ops: int) -> Array[Dictionary]:
+	var lower: int = max(min_ops, 0)
+	var upper: int = max(max_ops, lower)
+	var count: int = rng.randi_range(lower, upper)
+
+	# Pool of candidate ids reused across the sequence; size capped at
+	# count so short sequences still offer some variety without forcing
+	# a unique id per op.
+	var pool_size: int = min(DEFAULT_INVENTORY_ID_POOL_SIZE, max(count, 1))
+	var pool: Array[StringName] = []
+	for _i in range(pool_size):
+		pool.append(random_string_name(rng))
+
+	var ops: Array[Dictionary] = []
+	for _i in range(count):
+		var id_index: int = rng.randi_range(0, pool.size() - 1)
+		ops.append({
+			"item_id": pool[id_index],
+			"amount": rng.randi_range(1, DEFAULT_MAX_INVENTORY_AMOUNT),
+		})
+	return ops
+
+
 ## Default depth (levels beneath the root) used by random_node_tree when
 ## the caller does not override it. Small enough that property tests can
 ## enumerate every node quickly, large enough to cover nested paths like
