@@ -44,11 +44,12 @@ export interface InstallHooksDeps {
  * Resolve the compiled `commit-msg.js` and `pre-commit.js` scripts relative
  * to this module's location. In production they live at
  * `<package>/dist/scripts/git-hooks/*.js`; this file, once compiled, is at
- * `<package>/dist/cli/install_hooks.js`, so we walk two levels up.
+ * `<package>/dist/src/cli/install_hooks.js`, so we walk up to `dist/` via
+ * two `..` segments.
  */
 function defaultResolveHookTargets(): HookTargets {
   const here = dirname(fileURLToPath(import.meta.url));
-  const gitHooksDir = resolvePath(here, '..', 'scripts', 'git-hooks');
+  const gitHooksDir = resolvePath(here, '..', '..', 'scripts', 'git-hooks');
   return {
     commitMsgTarget: resolvePath(gitHooksDir, 'commit-msg.js'),
     preCommitTarget: resolvePath(gitHooksDir, 'pre-commit.js'),

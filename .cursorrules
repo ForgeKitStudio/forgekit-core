@@ -111,6 +111,16 @@ tree must come with a matching update to this section so the Context Commits
 hook accepts the commit. Per-tool documentation and transport details live
 in `docs/mcp_api.md`.
 
+**`install-hooks` CLI path resolution**: `src/cli/install_hooks.ts` compiles
+to `dist/src/cli/install_hooks.js` (note the `src/` segment — tsc preserves
+the source tree layout when `rootDir` is the package root). The
+`defaultResolveHookTargets` function walks two `..` segments up from that
+compiled file to reach `dist/`, then appends `scripts/git-hooks/` to reach
+the compiled hook scripts. Changing the tsconfig `rootDir` or moving the CLI
+entry file requires updating the `..` count and the regression test in
+`test/cli_install_hooks.test.ts` (the test runs the compiled binary against
+a tmp git repo and asserts the shim points at an existing module).
+
 ## Git hooks
 
 Git hooks are installed from `mcp-server/scripts/git-hooks/`:

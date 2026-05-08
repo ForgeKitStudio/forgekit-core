@@ -162,3 +162,57 @@ describe('runInstallHooks — resolves git dir and calls installer', () => {
     expect(stderrChunks.join('')).toContain('not a git repository');
   });
 });
+
+describe('forgekit-mcp install-hooks — compiled binary (regression)', () => {
+  // Regression pin: the compiled `dist/src/cli/install_hooks.js` must resolve
+  // hook targets to `dist/scripts/git-hooks/{commit-msg,pre-commit}.js`, and
+  // those files must exist in the built package. A previous version of the
+  // resolver walked the wrong number of directory levels and produced a
+  // shim pointing at a non-existent `dist/src/scripts/...` path, which made
+  // every commit fail with MODULE_NOT_FOUND.
+  it('writes a shim whose target is an existing compiled module', async () => {
+    const { mkdtemp, writeFile, readFile } = await import('node:fs/promises');
+    const { existsSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { spawnSync } = await import('node:child_process');
+    const { dirname, join, resolve } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+
+    const here = dirname(fileURLToPath(import.meta.url));
+    const packageRoot = resolve(here, '..');
+    const compiledBin = join(packageRoot, 'dist', 'src', 'index.js');
+    if (!existsSync(compiledBin)) {
+      // `npm run build` has not been executed in this tree; skip rather than
+      // fail, so the TS source tests can run on a bare checkout.
+      return;
+    }
+
+    const tmp = await mkdtemp(join(tmpdir(), 'forgekit-install-hooks-'));
+    spawnSync('git', ['init', '--quiet'], { cwd: tmp });
+    // Ensure at least one commit reference exists so `git rev-parse` works.
+    await writeFile(join(tmp, '.keep'), '');
+
+    const result = spawnSync('node', [compiledBin, 'install-hooks'], {
+      cwd: tmp,
+      encoding: 'utf8',
+    });
+    expect(result.status).toBe(0);
+
+    const shim = await readFile(join(tmp, '.git', 'hooks', 'commit-msg'), 'utf8');
+    // Extract the full path from `exec node "<absolute-path>" "$@"`.
+    // The shim produces a path relative to the repo root; since our tmp repo
+    // is not the package root, the relative path will traverse up out of
+    // tmp and back into the package. We normalise by resolving against tmp.
+    const match = shim.match(/exec node "\$\(git rev-parse --show-toplevel\)\/([^"]+)"/);
+    expect(match).not.toBeNull();
+    const relFromRepoRoot = match![1];
+    const resolvedTarget = resolve(tmp, relFromRepoRoot);
+
+    // The resolved absolute path must be the compiled commit-msg.js inside
+    // the package's dist/scripts/git-hooks directory.
+    expect(resolvedTarget).toBe(join(packageRoot, 'dist', 'scripts', 'git-hooks', 'commit-msg.js'));
+    expect(existsSync(resolvedTarget)).toBe(true);
+    // Must NOT have an extra `src/` segment (the bug we're pinning against).
+    expect(resolvedTarget).not.toMatch(/dist\/src\/scripts/);
+  });
+});
