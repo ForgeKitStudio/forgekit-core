@@ -75,6 +75,18 @@
       "module": "core"
     },
     {
+      "name": "profiling.get_performance_monitors",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "profiling.get_frame_stats",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
       "name": "combat.list_hitboxes",
       "scope": "module",
       "channel": "runtime",
@@ -87,7 +99,85 @@
       "module": "crafting"
     },
     {
+      "name": "crafting.list_recipes",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.get_recipe",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.create_recipe",
+      "scope": "module",
+      "channel": "editor",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.update_recipe",
+      "scope": "module",
+      "channel": "editor",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.delete_recipe",
+      "scope": "module",
+      "channel": "editor",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.validate_recipe",
+      "scope": "module",
+      "channel": "cli",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.simulate_cost",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
       "name": "inventory.add_item",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.remove_item",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.get_count",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.snapshot",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.clear",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.transfer",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.set_capacity",
       "scope": "module",
       "channel": "runtime",
       "module": "inventory"

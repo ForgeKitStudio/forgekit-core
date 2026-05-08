@@ -186,7 +186,11 @@ at startup. All services bind to `127.0.0.1` by default.
 
 The active port for each service is written to
 `user://mcp_active_port.json` so that the MCP server can discover the exact
-values at runtime.
+values at runtime. Updates to this file are crash-safe: each service writes
+its entry through a sibling `.tmp` file plus a rename, so a reader always
+observes either the complete previous contents or the complete new
+contents, and entries written by other services are preserved even if the
+write fails mid-flight.
 
 ### Port collisions
 

@@ -184,6 +184,91 @@ describe('applyProfile', () => {
   });
 });
 
+describe('applyProfile with unlockedModules option', () => {
+  it('Full is unchanged when unlockedModules is supplied (no duplicates, no filtering)', () => {
+    const base = names(applyProfile(FIXTURE, 'Full'));
+    const unlocked = names(
+      applyProfile(FIXTURE, 'Full', {
+        unlockedModules: new Set(['combat', 'crafting', 'inventory', 'stats']),
+      }),
+    );
+    expect(unlocked).toEqual(base);
+  });
+
+  it('Minimal remains core-minimal-only when unlockedModules is empty', () => {
+    const tools = applyProfile(FIXTURE, 'Minimal', {
+      unlockedModules: new Set(),
+    });
+    expect(names(tools)).toEqual(['project.info', 'project.list_modules', 'scene.open']);
+  });
+
+  it('Minimal adds RPG subsystem tools additively when unlockedModules includes them', () => {
+    const tools = applyProfile(FIXTURE, 'Minimal', {
+      unlockedModules: new Set(['combat']),
+    });
+    expect(names(tools)).toEqual([
+      'combat.list_hitboxes',
+      'project.info',
+      'project.list_modules',
+      'scene.open',
+    ]);
+  });
+
+  it('Lite adds RPG subsystem tools additively on top of the core scope', () => {
+    const tools = applyProfile(FIXTURE, 'Lite', {
+      unlockedModules: new Set(['crafting', 'inventory']),
+    });
+    expect(names(tools)).toEqual([
+      'crafting.execute',
+      'inventory.add_item',
+      'node.add',
+      'node.set_property',
+      'project.info',
+      'project.list_modules',
+      'scene.open',
+    ]);
+  });
+
+  it('RPG-only with a full unlockedModules set matches the licenseId path', () => {
+    const legacy = names(applyProfile(FIXTURE, 'RPG-only', { licenseId: 'forgekit_rpg' }));
+    const modern = names(
+      applyProfile(FIXTURE, 'RPG-only', {
+        unlockedModules: new Set(['combat', 'crafting', 'inventory', 'stats']),
+      }),
+    );
+    expect(modern).toEqual(legacy);
+  });
+
+  it('RPG-only with a partial unlockedModules set exposes only those subsystems', () => {
+    const tools = applyProfile(FIXTURE, 'RPG-only', {
+      unlockedModules: new Set(['combat']),
+    });
+    expect(names(tools)).toEqual([
+      'combat.list_hitboxes',
+      'project.info',
+      'project.list_modules',
+      'scene.open',
+    ]);
+  });
+
+  it('unlockedModules does not produce duplicate entries for tools already included', () => {
+    const tools = applyProfile(FIXTURE, 'Full', {
+      unlockedModules: new Set(['combat', 'crafting']),
+    });
+    const list = tools.map((t) => t.name);
+    const unique = new Set(list);
+    expect(unique.size).toBe(list.length);
+  });
+
+  it('licenseId === "forgekit_rpg" still unlocks all four RPG subsystems when unlockedModules is not provided', () => {
+    const legacy = names(applyProfile(FIXTURE, 'RPG-only', { licenseId: 'forgekit_rpg' }));
+    expect(legacy).toContain('combat.list_hitboxes');
+    expect(legacy).toContain('crafting.execute');
+    expect(legacy).toContain('inventory.add_item');
+    expect(legacy).toContain('stats.get_stat');
+  });
+});
+
 describe('profiles.json on disk', () => {
   it('loads from the shipped profiles.json and produces a non-empty Full profile', async () => {
     const { fileURLToPath } = await import('node:url');

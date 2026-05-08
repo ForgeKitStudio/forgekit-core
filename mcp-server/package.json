@@ -17,6 +17,7 @@
     },
     "scripts": {
         "build": "tsc -p tsconfig.scripts.json",
+        "typecheck": "tsc --noEmit -p tsconfig.scripts.json",
         "test": "vitest run",
         "test:watch": "vitest",
         "start": "node dist/src/index.js"

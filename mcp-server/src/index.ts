@@ -28,6 +28,7 @@ export interface CliOptions {
   stdio: boolean;
   profile: Profile;
   logLevel: LogLevel;
+  licenseDir: string | undefined;
 }
 
 const ALLOWED_PROFILES: readonly Profile[] = ['Full', 'Lite', 'Minimal', 'RPG-only'];
@@ -37,6 +38,7 @@ const DEFAULT_OPTIONS: CliOptions = {
   stdio: false,
   profile: 'Full',
   logLevel: 'info',
+  licenseDir: undefined,
 };
 
 /**
@@ -120,6 +122,21 @@ export function parseCliArgs(argv: readonly string[]): CliOptions {
       continue;
     }
 
+    if (flag === '--license-dir') {
+      let value: string | undefined;
+      if (inline !== null) {
+        value = inline;
+      } else {
+        value = argv[i + 1];
+        i += 1;
+      }
+      if (value === undefined || value === '') {
+        throw new Error('--license-dir requires a path value.');
+      }
+      options.licenseDir = value;
+      continue;
+    }
+
     throw new Error(`Unknown argument: "${raw}".`);
   }
 
@@ -168,12 +185,41 @@ export async function main(
   }
 
   const options = parseCliArgs(argv);
+
+  // Startup license scan: determine unlocked tool modules so profile
+  // filtering can expose subsystem tools once the Godot-side activation
+  // has written a record. I/O is best-effort; a missing directory or
+  // malformed files never block startup.
+  const unlocked = await discoverUnlockedModules(options);
+  process.stderr.write(
+    `[license] unlocked modules: [${[...unlocked].sort().join(', ')}]\n`,
+  );
+
   const message =
     `[@forgekit/core-mcp] skeleton — ` +
     `stdio=${options.stdio}, profile=${options.profile}, logLevel=${options.logLevel}. ` +
     `Transport bridges are not wired up yet.`;
   process.stderr.write(`${message}\n`);
   return 0;
+}
+
+async function discoverUnlockedModules(options: CliOptions): Promise<ReadonlySet<string>> {
+  const [{ resolveLicenseDir, loadActiveLicenses, unlockedModulesFromLicenses }] =
+    await Promise.all([import('./licensing/startup.js')]);
+  try {
+    const dir = await resolveLicenseDir({
+      projectRoot: process.cwd(),
+      licenseDir: options.licenseDir,
+    });
+    const records = await loadActiveLicenses(dir, {
+      logger: { warn: (msg: string) => process.stderr.write(`${msg}\n`) },
+    });
+    return unlockedModulesFromLicenses(records);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[license] discovery failed: ${message}\n`);
+    return new Set<string>();
+  }
 }
 
 // Run `main()` only when this module is executed directly, so tests can import

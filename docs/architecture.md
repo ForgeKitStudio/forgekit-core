@@ -60,6 +60,13 @@ the right channel per tool.
 - **Protocol:** JSON-RPC 2.0 (standard request/response, ids, batching).
 - **Runs inside:** the Godot editor, as a tool script under
   `addons/forgekit_core/mcp/editor_plugin/`.
+- **Bind-time warnings.** On a successful start with the default
+  loopback `bind_address = "127.0.0.1"`, the server emits no warnings —
+  `get_warnings()` returns an empty array. Configuring a non-loopback
+  `bind_address` (for example `0.0.0.0`) still starts the server but
+  appends an `EXTERNAL_BIND_ENABLED` warning to `get_warnings()` so the
+  operator knows editor-plugin traffic is now reachable beyond the
+  local host.
 - **Mutation safety:** every tool that changes scene or resource state
   goes through `Undo_Redo_Wrapper`, so `Ctrl+Z` in the editor always
   reverts an agent edit. Writes to `project.godot` and `.tres` files go
@@ -91,8 +98,23 @@ the right channel per tool.
 
 - **Transport:** UDP on `127.0.0.1`. First free port in the range
   `6020-6029` is selected at startup, and the active port is written to
-  `user://mcp_active_port.json`. Active only when the game is launched
-  with the `--mcp-bridge` flag.
+  `user://mcp_active_port.json` under the `runtime` key. Active only
+  when the game is launched with the `--mcp-bridge` flag.
+- **Bind-time warnings.** On a successful start with the default
+  loopback `bind_address = "127.0.0.1"`, the server emits no warnings —
+  `get_warnings()` returns an empty array. Configuring a non-loopback
+  `bind_address` (for example `0.0.0.0`) still starts the server but
+  appends an `EXTERNAL_BIND_ENABLED` warning to `get_warnings()` so the
+  operator knows runtime-bridge traffic is now reachable beyond the
+  local host.
+- **Active-port file atomicity:** the runtime bridge writes its entry
+  through a sibling `.tmp` file plus a rename, so a concurrent reader
+  observes either the complete previous contents or the complete new
+  contents of `user://mcp_active_port.json`, never a truncated file. If
+  the rename fails the existing file is left byte-for-byte intact and
+  the `.tmp` sidecar is cleaned up, so entries written by other
+  channels (editor, visualizer, health) survive a failed runtime-bridge
+  write.
 - **Protocol:** JSON-RPC 2.0 framed into individual UDP datagrams. The
   server rejects packets larger than 65 507 bytes with
   `PACKET_TOO_LARGE`.
@@ -104,7 +126,10 @@ the right channel per tool.
   `eval`.
 - **Typical tools:** `inventory.add_item`, `inventory.get_count`,
   `crafting.execute`, `input.simulate_action`,
-  `scene.get_tree_snapshot`, `runtime.handshake`, `runtime.heartbeat`.
+  `scene.get_tree_snapshot`, `runtime.get_scene_tree`,
+  `runtime.get_current_scene`, `runtime.change_scene`,
+  `runtime.reload_current_scene`, `runtime.handshake`,
+  `runtime.heartbeat`.
 
 ## Module consolidation — why `forgekit_rpg` is one module
 
