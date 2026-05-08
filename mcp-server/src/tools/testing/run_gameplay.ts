@@ -1,20 +1,16 @@
 /**
  * Implementation of the `tests.run_gameplay` MCP tool.
  *
- * Spawns Godot with the runtime bridge (`--mcp-bridge`) targeting a scene
- * that drives a gameplay test. Optional `steps` are serialized as a single
- * JSON argv element (`--mcp-bridge-steps=<json>`), so the scene script can
- * read them via `OS.get_cmdline_args()` without further parsing. No shell
- * is ever involved, so scene paths and step names can contain any
- * character that is legal in a Godot resource path.
+ * Thin shim over `Gameplay_Test_Runner` (see `gameplay_test_runner.ts`).
+ * The MCP tool contract keeps the historical `scene_path` + optional
+ * `steps` parameter shape; the runner owns the argv construction, spawn
+ * invocation and TestReport extraction.
  */
 
-import { ToolInputError } from './errors.js';
 import {
-  extractReportFromStdout,
-  syntheticFailureReport,
-} from './report_extractor.js';
-import { defaultSpawnGodot, type SpawnGodot } from './spawn_godot.js';
+  runGameplayScenario,
+  type RunGameplayScenarioDeps,
+} from './gameplay_test_runner.js';
 import type { TestReport } from './test_report.js';
 
 export interface RunGameplayParams {
@@ -22,44 +18,14 @@ export interface RunGameplayParams {
   steps?: readonly string[];
 }
 
-export interface RunGameplayDeps {
-  spawn?: SpawnGodot;
-}
-
-function requireNonBlank(value: string | undefined, field: string): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new ToolInputError(
-      `"${field}" must be a non-empty string (got ${JSON.stringify(value)}).`,
-    );
-  }
-  return value;
-}
+export type RunGameplayDeps = RunGameplayScenarioDeps;
 
 export async function runGameplay(
   params: RunGameplayParams,
   deps: RunGameplayDeps = {},
 ): Promise<TestReport> {
-  const scenePath = requireNonBlank(params.scene_path, 'scene_path');
-
-  const args: string[] = ['--headless', '--mcp-bridge', scenePath];
-
-  if (params.steps !== undefined && params.steps.length > 0) {
-    params.steps.forEach((step, i) => {
-      if (typeof step !== 'string' || step.trim() === '') {
-        throw new ToolInputError(
-          `"steps[${i}]" must be a non-empty string (got ${JSON.stringify(step)}).`,
-        );
-      }
-    });
-    args.push(`--mcp-bridge-steps=${JSON.stringify(params.steps)}`);
-  }
-
-  const spawn = deps.spawn ?? defaultSpawnGodot;
-  const { stdout, stderr, exitCode } = await spawn(args);
-
-  const report = extractReportFromStdout(stdout);
-  if (report !== null) {
-    return report;
-  }
-  return syntheticFailureReport({ stderr, exitCode });
+  return runGameplayScenario(
+    { scene_path: params.scene_path, steps: params.steps },
+    deps,
+  );
 }

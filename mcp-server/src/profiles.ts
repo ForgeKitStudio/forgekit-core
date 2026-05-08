@@ -38,8 +38,24 @@ export interface ProfilesFile {
 }
 
 export interface ApplyProfileOptions {
-  /** License identifier required for RPG-only profile subsystem tools. */
+  /**
+   * License identifier (legacy interface).
+   *
+   * When `licenseId === 'forgekit_rpg'` and `unlockedModules` is not
+   * supplied, the RPG-only profile unlocks all four subsystem modules.
+   * When `licenseId` is any other non-null value and `unlockedModules`
+   * is not supplied, `RpgLicenseRequiredError` is raised for the
+   * RPG-only profile. Ignored by every other profile.
+   */
   readonly licenseId?: string | null;
+  /**
+   * Explicit set of subsystem modules to expose in addition to the
+   * base profile filter. When provided, this takes precedence over
+   * `licenseId`. Passing a non-empty set turns on the corresponding
+   * module tools for any profile (Full, Lite, Minimal, RPG-only) in
+   * an additive manner, deduplicating against tools already selected.
+   */
+  readonly unlockedModules?: ReadonlySet<ToolModule>;
 }
 
 export const VALID_PROFILES: ReadonlyArray<ProfileName> = [
@@ -190,8 +206,18 @@ export async function loadProfiles(path: string): Promise<ProfilesFile> {
 }
 
 /**
- * Filters `profiles.tools` for `profileName`. The RPG-only profile consults
- * `options.licenseId`; other profiles ignore licensing.
+ * Filters `profiles.tools` for `profileName`.
+ *
+ * The optional `options.unlockedModules` set is additive across every
+ * profile: any tool whose `module` is contained in the set is included
+ * regardless of whether the base profile filter would have kept it.
+ * This lets the MCP server's startup license scan unlock RPG subsystem
+ * tools on top of any profile without touching the profile definitions.
+ *
+ * For backwards compatibility the legacy `options.licenseId` argument
+ * is honoured when `unlockedModules` is not supplied: `licenseId ===
+ * 'forgekit_rpg'` maps to the four RPG subsystem modules, any other
+ * non-null id raises `RpgLicenseRequiredError` for the RPG-only profile.
  */
 export function applyProfile(
   profiles: ProfilesFile,
@@ -203,40 +229,57 @@ export function applyProfile(
   }
 
   const tools = profiles.tools;
+  const explicitUnlock = options.unlockedModules;
+  const licenseId = options.licenseId ?? null;
 
-  switch (profileName) {
-    case 'Full':
-      return [...tools];
+  // Resolve the effective unlock set. Explicit `unlockedModules` wins;
+  // otherwise fall back to the legacy licenseId → RPG mapping.
+  let unlocked: ReadonlySet<ToolModule>;
+  if (explicitUnlock !== undefined) {
+    unlocked = explicitUnlock;
+  } else if (licenseId === RPG_LICENSE_ID) {
+    unlocked = RPG_SUBSYSTEM_MODULES;
+  } else {
+    unlocked = new Set<ToolModule>();
+  }
 
-    case 'Lite':
-      return tools.filter((t) => t.scope === 'core');
-
-    case 'Minimal':
-      return tools.filter((t) => t.module === 'core-minimal');
-
-    case 'RPG-only': {
-      const licenseId = options.licenseId ?? null;
-      if (licenseId !== null && licenseId !== RPG_LICENSE_ID) {
-        throw new RpgLicenseRequiredError(
-          `RPG-only profile requires license_id "${RPG_LICENSE_ID}", got "${licenseId}".`,
-        );
+  const selectByProfile = (t: ToolEntry): boolean => {
+    switch (profileName) {
+      case 'Full':
+        return true;
+      case 'Lite':
+        return t.scope === 'core';
+      case 'Minimal':
+        return t.module === 'core-minimal';
+      case 'RPG-only':
+        return t.module === 'core-minimal';
+      default: {
+        const never: never = profileName;
+        throw new UnknownProfileError(String(never));
       }
-      const hasLicense = licenseId === RPG_LICENSE_ID;
-      return tools.filter((t) => {
-        if (t.module === 'core-minimal') {
-          return true;
-        }
-        if (RPG_SUBSYSTEM_MODULES.has(t.module)) {
-          return hasLicense;
-        }
-        return false;
-      });
     }
+  };
 
-    default: {
-      // Exhaustive guard: if a new profile is added this branch will flag it.
-      const never: never = profileName;
-      throw new UnknownProfileError(String(never));
+  if (profileName === 'RPG-only' && explicitUnlock === undefined) {
+    if (licenseId !== null && licenseId !== RPG_LICENSE_ID) {
+      throw new RpgLicenseRequiredError(
+        `RPG-only profile requires license_id "${RPG_LICENSE_ID}", got "${licenseId}".`,
+      );
     }
   }
+
+  const seen = new Set<string>();
+  const out: ToolEntry[] = [];
+  for (const t of tools) {
+    const keep = selectByProfile(t) || unlocked.has(t.module);
+    if (!keep) {
+      continue;
+    }
+    if (seen.has(t.name)) {
+      continue;
+    }
+    seen.add(t.name);
+    out.push(t);
+  }
+  return out;
 }

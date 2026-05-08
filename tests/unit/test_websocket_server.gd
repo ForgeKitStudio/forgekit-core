@@ -128,7 +128,7 @@ func test_start_writes_selected_port_to_active_port_file_under_editor_key() -> v
 	assert_true(result.get("ok", false), "start() must succeed in this scenario")
 
 	var data: Dictionary = _read_active_port_file()
-	assert_eq(data.get("editor", -1), 6011, "Active port file must record the chosen editor port under the 'editor' key")
+	assert_eq(int(data.get("editor", -1)), 6011, "Active port file must record the chosen editor port under the 'editor' key")
 
 
 # ---------------------------------------------------------------------------
@@ -149,10 +149,10 @@ func test_start_merges_editor_key_into_existing_active_port_file() -> void:
 	assert_true(result.get("ok", false), "start() must succeed in this scenario")
 
 	var data: Dictionary = _read_active_port_file()
-	assert_eq(data.get("editor", -1), 6010, "Editor port must be inserted into the active-port file")
-	assert_eq(data.get("runtime", -1), 6025, "Pre-existing runtime key must be preserved")
-	assert_eq(data.get("visualizer", -1), 6030, "Pre-existing visualizer key must be preserved")
-	assert_eq(data.get("health", -1), 6040, "Pre-existing health key must be preserved")
+	assert_eq(int(data.get("editor", -1)), 6010, "Editor port must be inserted into the active-port file")
+	assert_eq(int(data.get("runtime", -1)), 6025, "Pre-existing runtime key must be preserved")
+	assert_eq(int(data.get("visualizer", -1)), 6030, "Pre-existing visualizer key must be preserved")
+	assert_eq(int(data.get("health", -1)), 6040, "Pre-existing health key must be preserved")
 
 
 # ---------------------------------------------------------------------------
@@ -207,12 +207,21 @@ func test_start_emits_external_bind_enabled_warning_for_non_loopback_bind() -> v
 func test_start_does_not_emit_external_bind_warning_for_loopback() -> void:
 	_server = _new_server()
 
-	var _result: Dictionary = _server.start(FakeConfig.new())
+	var result: Dictionary = _server.start(FakeConfig.new())
+
+	# Start must succeed on the loopback default — otherwise the absence of
+	# the warning would be meaningless (an aborted start cannot emit one).
+	assert_true(result.get("ok", false), "start() must succeed on the default loopback config")
 
 	var warnings: Array = _server.get_warnings()
+	var has_external_bind_warning: bool = false
 	for w in warnings:
 		var wd: Dictionary = w
-		assert_ne(wd.get("code", ""), "EXTERNAL_BIND_ENABLED", "Loopback bind must not raise EXTERNAL_BIND_ENABLED")
+		if wd.get("code", "") == "EXTERNAL_BIND_ENABLED":
+			has_external_bind_warning = true
+			break
+	assert_false(has_external_bind_warning, "Loopback bind must not raise EXTERNAL_BIND_ENABLED")
+	assert_eq(warnings.size(), 0, "A successful loopback start must emit no warnings at all")
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +249,7 @@ func test_stop_releases_port_and_clears_editor_key_in_active_port_file() -> void
 
 	var data: Dictionary = _read_active_port_file()
 	assert_false(data.has("editor"), "stop() must remove the 'editor' key from the active-port file")
-	assert_eq(data.get("runtime", -1), 6025, "stop() must preserve sibling keys in the active-port file")
+	assert_eq(int(data.get("runtime", -1)), 6025, "stop() must preserve sibling keys in the active-port file")
 
 
 # ---------------------------------------------------------------------------

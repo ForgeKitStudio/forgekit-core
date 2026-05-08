@@ -53,7 +53,7 @@ function fakeSpawn(
 }
 
 describe('runGameplay — happy path', () => {
-  it('spawns godot with --headless, --mcp-bridge and the scene_path', async () => {
+  it('spawns godot with --headless, --mcp-bridge and --scene=<path>', async () => {
     const calls: Call[] = [];
     const spawn = fakeSpawn(JSON.stringify(sampleReport), { calls });
     await runGameplay(
@@ -63,7 +63,7 @@ describe('runGameplay — happy path', () => {
     expect(calls[0].args).toEqual([
       '--headless',
       '--mcp-bridge',
-      'res://tests/scenes/crafting.tscn',
+      '--scene=res://tests/scenes/crafting.tscn',
     ]);
   });
 

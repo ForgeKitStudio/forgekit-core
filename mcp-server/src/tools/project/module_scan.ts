@@ -165,9 +165,14 @@ function parseStringNameArray(raw: string): string[] {
 }
 
 function extractArrayBody(raw: string): string | null {
-  const open = raw.indexOf('[');
+  // The actual array body is always the innermost `[...]`, not any
+  // leading type hint like `Array[StringName]` in a typed-array
+  // constructor. Walking from the end finds the real opener reliably
+  // for both `Array[StringName]([...])` and bare `[...]`.
   const close = raw.lastIndexOf(']');
-  if (open === -1 || close === -1 || close <= open) return null;
+  if (close === -1) return null;
+  const open = raw.lastIndexOf('[', close - 1);
+  if (open === -1 || close <= open) return null;
   return raw.slice(open + 1, close);
 }
 

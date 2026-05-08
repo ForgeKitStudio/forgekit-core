@@ -38,6 +38,7 @@ negative range reserved for server errors (`-32000` to `-32099`):
 | Code     | Symbol                             | Meaning |
 | -------- | ---------------------------------- | ------- |
 | `-32004` | `NON_UNDOABLE_OPERATION`           | Warning envelope attached to a successful result when the underlying mutation happens outside `EditorUndoRedoManager`. |
+| `-32005` | `PACKET_TOO_LARGE`                 | A UDP datagram arriving on the `runtime` channel exceeds the configured size limit. `data` carries `{ size, limit, suggestion }`, where `size` is the rejected datagram's byte length and `limit` defaults to 65 507 (the IPv4 UDP payload ceiling). |
 | `-32009` | `TRANSACTION_NOT_OPEN`             | `transaction.commit` / `transaction.rollback` was called with a `transaction_id` that is not currently open. |
 | `-32011` | `MANIFEST_TAG_NOT_FOUND`           | `manifest.core_min_version` points at a Git tag that does not exist in Core. |
 | `-32012` | `CONTEXT_FILE_STALE`               | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. |
@@ -405,6 +406,148 @@ The validator completes within 500 ms for files up to 200 KB on a
 four-core CPU. A file that parses cleanly returns
 `{ "ok": true, "errors": [] }`.
 
+## Profiling category
+
+Tools in the profiling category target the `runtime` channel and return
+samples from the Godot `Performance` singleton on the running game.
+
+### `profiling.get_performance_monitors` — `runtime`
+
+Samples the requested `Performance` monitors and returns their current
+values.
+
+**Params:**
+
+```json
+{ "monitors": ["fps", "draw_calls", "physics_frames"] }
+```
+
+`monitors` is optional. When omitted or empty, the runtime bridge
+returns the full baseline set, which includes at minimum `fps`,
+`draw_calls`, and `physics_frames`. When provided, only the requested
+monitors are returned; unknown monitor names are omitted from the
+response. Monitor names follow Godot's `Performance` vocabulary
+(for example `fps`, `draw_calls`, `physics_frames`, `memory_static`,
+`render_total_objects`).
+
+**Result:**
+
+```json
+{
+  "monitors": {
+    "fps": 60.0,
+    "draw_calls": 128.0,
+    "physics_frames": 60.0
+  }
+}
+```
+
+All monitor values are numbers; integer-valued monitors are returned as
+floats so callers never need to branch on the underlying type. The tool
+is read-only and safe to call at any frame rate; a single call samples
+each requested monitor exactly once.
+
+## Runtime category
+
+Runtime-channel tools drive the live game over the UDP MCP bridge. They
+are reachable only while the game is running with `--mcp-bridge`. Each
+handler accepts JSON-RPC `params` either by-name (a `Dictionary`) or
+by-position (an `Array`); the positional order matches the named
+parameters documented below.
+
+### `runtime.get_scene_tree` — `runtime`
+
+Returns a snapshot of the live scene tree rooted at the active scene.
+This is the runtime-channel sibling of the editor-channel
+`scene.get_tree_snapshot` tool.
+
+**Params:**
+
+```json
+{ "max_depth": 2 }
+```
+
+`max_depth` is optional. When omitted it defaults to `-1`, meaning no
+depth limit. `0` returns the root only, `1` includes its direct
+children, and so on. Non-integer values are coerced through the same
+param adapter used by the rest of the runtime category.
+
+**Result:**
+
+```json
+{
+  "tree": {
+    "path": "/root/Main",
+    "type": "Node",
+    "children": []
+  }
+}
+```
+
+Each node in `tree` carries at minimum its absolute `path`, its Godot
+`type`, and its `children` array. The tool is read-only and safe to
+call at any frame rate.
+
+### `runtime.get_current_scene` — `runtime`
+
+Returns the active scene's filesystem path and its root node path in
+the live tree.
+
+**Params:** `{}`
+
+**Result:**
+
+```json
+{
+  "scene_path": "res://scenes/main.tscn",
+  "root_path": "/root/Main"
+}
+```
+
+`scene_path` is the `res://` path of the active scene resource;
+`root_path` is the absolute node path of its root in the running tree.
+
+### `runtime.change_scene` — `runtime`
+
+Requests a scene change in the running game. The game drives the actual
+transition through `SceneTree.change_scene_to_file()` on the next
+available frame.
+
+**Params:**
+
+```json
+{ "scene_path": "res://scenes/other.tscn" }
+```
+
+`scene_path` is required and must resolve to an existing `res://` scene
+file. Positional form (`["res://scenes/other.tscn"]`) is accepted as an
+equivalent shape.
+
+**Result:**
+
+```json
+{ "changed": true }
+```
+
+The `changed: true` envelope confirms the change request was accepted
+by the bridge; the actual scene transition happens asynchronously on
+the next frame boundary.
+
+### `runtime.reload_current_scene` — `runtime`
+
+Reloads the active scene in place, preserving the running process.
+
+**Params:** `{}`
+
+**Result:**
+
+```json
+{ "reloaded": true }
+```
+
+The tool is idempotent from the caller's perspective: successive calls
+each trigger a fresh reload of whichever scene is active at call time.
+
 ## Beyond v0.1
 
 Tools for Scene, Node, Input, Runtime, Animation, TileMap, Theme,
@@ -415,3 +558,47 @@ Generation, and Visualizer ship across later milestones (v0.2 through
 v1.0). Each of those tools follows the same JSON-RPC 2.0 envelope and
 the same error-code conventions described above. See the design
 document for the full inventory and the phase in which each tool lands.
+
+## Profiling category
+
+Two runtime-channel tools surface frame-level performance telemetry from
+the live game to clients that hold the MCP Runtime Bridge connection.
+Both tools require the game to have been launched with `--mcp-bridge`.
+
+### `profiling.get_frame_stats` — `runtime`
+
+Returns percentile-summarized frame times and the current draw-call
+count over a rolling window of the most recent frames captured by the
+MCP Runtime Bridge.
+
+**Params:**
+
+```json
+{ "window_frames": 120 }
+```
+
+`window_frames` is optional. When omitted the bridge uses a default of
+120 (≈2 seconds at 60 fps). The value must be a positive integer; zero,
+negative, non-integer, or non-numeric values are rejected with
+`INVALID_ARGUMENT`.
+
+**Result:**
+
+```json
+{
+  "window_frames": 120,
+  "samples": 120,
+  "frame_time_ms": { "p50": 16.5, "p95": 19.0, "p99": 22.0 },
+  "draw_calls": 742
+}
+```
+
+- `window_frames` echoes the requested window size.
+- `samples` is the actual number of frames present in the ring buffer at
+  call time. During the first `window_frames` frames after `--mcp-bridge`
+  startup, `samples` is less than `window_frames`; from then on the two
+  are equal.
+- `frame_time_ms.pXX` are nearest-rank percentiles (ms) of the buffered
+  frame times. When `samples == 0` all three values are `0.0`.
+- `draw_calls` is the latest sample from the Godot `Performance`
+  `RENDER_TOTAL_DRAW_CALLS_IN_FRAME` monitor.

@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://crafting_test_scene_0001"]
+
+; Integration-test scene for the crafting gameplay scenario (task 3.16).
+;
+; The scene is intentionally a bare skeleton: three placeholder `Node`s
+; that the integration test (`tests/integration/test_crafting_scenario.gd`)
+; populates at runtime. The real subsystem classes — `InventorySystem`
+; and `CraftingManager` — extend `RefCounted`, so they cannot be
+; attached directly as scene scripts; the test instantiates them through
+; `addons/forgekit_rpg/public_api.gd` and binds them to the matching
+; `Node` via `set_meta`/`set` once the RPG module has been installed.
+;
+; Keeping the scene free of `ext_resource` references to the paid
+; `addons/forgekit_rpg/**` scripts also keeps this file loadable in the
+; public Core template, where the module ships only as a placeholder
+; `.gitkeep` directory.
+
+[node name="CraftingTestScene" type="Node"]
+
+[node name="InventorySystem" type="Node" parent="."]
+
+[node name="CraftingManager" type="Node" parent="."]
+
+[node name="Player" type="Node" parent="."]
