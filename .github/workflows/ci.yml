@@ -105,6 +105,18 @@ jobs:
         working-directory: mcp-server
         run: npm ci
 
+      - name: Pre-warm Godot global class cache
+        # The property tests that shell out to Godot rely on class_name
+        # resolution for types like `GDScriptValidator` across multiple
+        # source files. In a fresh CI checkout
+        # `.godot/global_script_class_cache.cfg` does not exist and
+        # headless `--script` invocations cannot resolve cross-file
+        # class references. Running `--editor --quit` once populates
+        # the cache (and the asset-import cache) so every subsequent
+        # spawn starts from a warm state.
+        shell: bash
+        run: godot --headless --editor --quit --path .
+
       - name: Run fast-check property tests (Vitest)
         # Vitest propagates the exit code from the fast-check runner, so a
         # failing property surfaces its counterexample in stderr and turns
