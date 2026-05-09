@@ -10,6 +10,61 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+### Added
+
+- **Visualizer category (5 new MCP tools)**: `visualizer.start`,
+  `visualizer.stop`, `visualizer.render_scene_tree`,
+  `visualizer.render_module_graph`, `visualizer.render_event_bus`. The
+  browser visualizer's HTTP server now also serves `/api/module_graph`
+  and `/api/event_bus` endpoints alongside the existing
+  `/api/scene_tree`, and the HTML view exposes three tabs with a
+  colour-coded force-directed layout (scene=blue, module=green, event
+  bus=amber).
+- **Asset Generation category (4 new MCP tools)**:
+  `assetgen.sprite_from_svg`, `assetgen.atlas_pack`,
+  `assetgen.noise_texture`, `assetgen.icon_set`. Every write is routed
+  through `McpUndoRedoWrapper` so a single Ctrl+Z reverts the mutation.
+  Backends: `McpSvgRasterizer`, `McpTexturePacker`, `McpNoiseGenerator`,
+  `McpIconSetGenerator` under `addons/forgekit_core/mcp/editor_plugin/asset_generator/`.
+- **Self-Healing category (5 new MCP tools)**: `healing.suggest_action`,
+  `healing.inspect_failure`, `healing.get_retry_count`,
+  `healing.reset_retry_count`, `healing.apply_and_retest`. Per-session
+  retry counter with a hard limit of 3; on exhaustion the suggester
+  escalates to `manual_review` regardless of failure-message rules.
+  Emits a `retry_exhausted` signal at the limit and can push a
+  `mcp.healing.retries` counter into an injected metrics sink.
+- **14 new entries** in `mcp-server/profiles.json` for the three tool
+  categories above (all `scope: core`, `channel: editor`, `module: core`).
+- **4 new property tests**:
+  - **Property 22** (`tests/property/test_healing_retry_limit.gd`,
+    GDScript / CoreFuzz, 100 iterations) — self-healing escalates to
+    `manual_review` after 3 failed repair attempts.
+  - **Property 23** (`mcp-server/test/property_suggested_action_set.test.ts`,
+    fast-check, `numRuns: 100`) — every `suggested_action` lies in
+    `{"inspect_tres", "validate_gdscript", "rerun_test", "manual_review"}`.
+  - **Property 24** (`mcp-server/test/property_resource_inspect.test.ts`,
+    fast-check, `numRuns: 100`) — `inspectTres(...)` surfaces injected
+    mutations and emits a `suggested_fix` for missing-reference cases.
+  - **Property 25** (`mcp-server/test/property_apply_fix_undo.test.ts`,
+    fast-check, `numRuns: 100`) — `apply_fix` followed by the editor
+    UndoRedo undo restores the original file byte-for-byte.
+- **`mcp-server/src/healing/suggest_action.ts`** — TypeScript port of
+  the GDScript suggester rule set.
+- **`mcp-server/src/healing/resource_inspect.ts`** — pure-TypeScript
+  `.tres` inspector / fixer used by Properties 24 and 25.
+- **`docs/mcp_api.md`** — Visualizer, Asset Generation, and
+  Self-Healing sections documenting the 14 new tools.
+
+### Changed
+
+- **`plugin_lifecycle.gd`** now accepts optional factories for the
+  dispatcher, visualizer HTTP server, and three tool adapters. Older
+  callers that only wire `server_factory` remain valid.
+- **`http_server.gd`** for the visualizer exposes
+  `set_module_provider()` and `set_event_bus_provider()` callbacks.
+- **`ui/index.html`** replaces the single scene-tree view with a
+  three-tab layout backed by view-specific endpoints and styling.
+
 ## [0.7.0] - 2026-05-09
 
 ### Added

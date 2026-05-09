@@ -39,6 +39,10 @@ negative range reserved for server errors (`-32000` to `-32099`):
 | -------- | ---------------------------------- | ------- |
 | `-32004` | `NON_UNDOABLE_OPERATION`           | Warning envelope attached to a successful result when the underlying mutation happens outside `EditorUndoRedoManager`. |
 | `-32005` | `PACKET_TOO_LARGE`                 | A UDP datagram arriving on the `runtime` channel exceeds the configured size limit. `data` carries `{ size, limit, suggestion }`, where `size` is the rejected datagram's byte length and `limit` defaults to 65 507 (the IPv4 UDP payload ceiling). |
+| `-32005` | `MODULE_NOT_FOUND`                 | A `modules.*` tool was called with a `module_id` that is not present under `<projectRoot>/addons/`. Shares a numeric code with `PACKET_TOO_LARGE` but is disambiguated by `message` and by the originating channel (`editor` / `cli`, not `runtime`). |
+| `-32006` | `license_verification_failed`      | `modules.activate_license` rejected the supplied license. `data` carries `{ module_id }`. |
+| `-32007` | `ACTIVATION_FAILED`                | `modules.activate_license` failed for a non-canonical reason (file I/O, HMAC-context errors). `data` carries `{ module_id, original_error }`. |
+| `-32008` | `CORE_VERSION_UNAVAILABLE`         | `modules.check_compatibility` could not resolve the installed Core version from the repository's git tag. `data.reason` is `"git_describe_failed"` or `"git_describe_empty"`; `data.git_stderr` mirrors git's stderr when present. |
 | `-32009` | `TRANSACTION_NOT_OPEN`             | `transaction.commit` / `transaction.rollback` was called with a `transaction_id` that is not currently open. |
 | `-32011` | `MANIFEST_TAG_NOT_FOUND`           | `manifest.core_min_version` points at a Git tag that does not exist in Core. |
 | `-32012` | `CONTEXT_FILE_STALE`               | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. |
@@ -151,9 +155,10 @@ carry a valid `module.manifest.tres`.
 ```
 
 Entries are sorted by `id` in ascending order so callers get a stable
-diff across calls. `enabled` is `true` for any discoverable module in
-v0.1; the `modules.enable` / `modules.disable` pair that flips this flag
-ships in a later phase.
+diff across calls. `enabled` is `true` for any discoverable module that
+has not been disabled through `modules.disable`; the flag is toggled
+via the `modules.enable` / `modules.disable` pair documented in the
+Module management category below.
 
 ### `project.check_imports` — `cli`
 
@@ -548,12 +553,194 @@ Reloads the active scene in place, preserving the running process.
 The tool is idempotent from the caller's perspective: successive calls
 each trigger a fresh reload of whichever scene is active at call time.
 
+## Module management category
+
+The `modules.*` tool family ships alongside `project.list_modules` and
+lets agents inspect installed modules, check Core compatibility,
+activate license keys, and toggle module enablement. Together with
+`project.list_modules`, these tools are the contract
+`docs/SKILLS/module_licensing.md` walks through end-to-end.
+
+All parameters below accept either by-name (`{ ... }`) or by-position
+(`[ ... ]`) JSON-RPC params. `projectRoot` is always an absolute path
+to the Godot project root.
+
+### `modules.list` — `editor`, `cli`
+
+Enumerates every discovered module under `addons/forgekit_*/` together
+with its persisted `enabled` flag and a derived `has_active_license`
+flag.
+
+**Params:**
+
+```json
+{ "projectRoot": "<absolute path>", "licenseDir": "<absolute path to user://licenses mirror>" }
+```
+
+`licenseDir` is the host-side mirror of Godot's `user://licenses/`
+directory. The server resolves this path automatically on startup so
+typical MCP callers pass through whatever the server supplied.
+
+**Result:**
+
+```json
+{
+  "modules": [
+    {
+      "id": "forgekit_rpg",
+      "version": "1.0.0",
+      "license_id": "forgekit_rpg_eula",
+      "core_min_version": "0.7.0",
+      "source_repo": "ForgeKitStudio/forgekit-rpg",
+      "enabled": true,
+      "has_active_license": true
+    }
+  ]
+}
+```
+
+`has_active_license` is `true` when a `<module_id>.key` file exists in
+`licenseDir`; `false` otherwise. Entries are sorted by `id` in
+ascending order for stable diffs across calls.
+
+### `modules.inspect_manifest` — `editor`, `cli`
+
+Returns the full manifest of a single installed module plus the
+absolute `manifest_path` that was read.
+
+**Params:** `{ "projectRoot": "<absolute path>", "moduleId": "<id>" }`
+
+**Result:**
+
+```json
+{
+  "id": "forgekit_rpg",
+  "version": "1.0.0",
+  "core_min_version": "0.7.0",
+  "depends_on": [],
+  "license_id": "forgekit_rpg_eula",
+  "source_repo": "ForgeKitStudio/forgekit-rpg",
+  "manifest_path": "/abs/path/addons/forgekit_rpg/module.manifest.tres"
+}
+```
+
+An unknown `moduleId` raises `MODULE_NOT_FOUND` (`-32005`).
+
+### `modules.check_compatibility` — `editor`, `cli`
+
+Compares a module's `core_min_version` to the Core version resolved
+from the repository's git tag at `projectRoot`. SemVer pre-release and
+build metadata are stripped before comparison because ForgeKit
+manifests do not use them.
+
+**Params:** `{ "projectRoot": "<absolute path>", "moduleId": "<id>" }`
+
+**Result:**
+
+```json
+{
+  "compatible": true,
+  "core_version": "0.7.0",
+  "core_min_version": "0.7.0",
+  "module_id": "forgekit_rpg"
+}
+```
+
+When `compatible` is `false` the response includes a human-readable
+`reason` field (for example `"core_version 0.6.0 < core_min_version
+0.7.0"`), and the server emits a `CORE_VERSION_MISMATCH` warning
+through its logger with the same `module_id`, `core_min_version`, and
+`core_version` values so operators can see the mismatch in the log
+stream without re-reading the manifest.
+
+Errors:
+
+- `MODULE_NOT_FOUND` (`-32005`) — `moduleId` is not installed.
+- `CORE_VERSION_UNAVAILABLE` (`-32008`) — git could not resolve a tag
+  at `projectRoot`. `data.reason` is `"git_describe_failed"` or
+  `"git_describe_empty"`.
+
+### `modules.activate_license` — `editor`, `cli`
+
+Activates a license key and persists the activation record. The actual
+persistence runs inside Godot through the GDScript `LicenseStore`; the
+server-side tool accepts a pluggable `activator` whose signature
+mirrors the store's HMAC-SHA256 verifier.
+
+**Params:**
+
+```json
+{
+  "moduleId": "forgekit_rpg",
+  "licenseId": "forgekit_rpg_eula",
+  "signature": "<HMAC-SHA256 signature issued by the publisher>"
+}
+```
+
+**Result (success):**
+
+```json
+{
+  "activated": true,
+  "module_id": "forgekit_rpg",
+  "record": {
+    "license_id": "forgekit_rpg_eula",
+    "activated_at": "2026-05-09T12:34:56Z",
+    "fingerprint": "<machine fingerprint>"
+  },
+  "path": "<abs path to user://licenses/forgekit_rpg.key>"
+}
+```
+
+Errors:
+
+- `license_verification_failed` (`-32006`) — the HMAC signature did
+  not verify. `data.module_id` identifies the module.
+- `ACTIVATION_FAILED` (`-32007`) — activation failed for a
+  non-canonical reason (file I/O, HMAC-context start error). The
+  original failure string is forwarded verbatim as
+  `data.original_error` so operators can diagnose host-specific
+  breakage without the code being rebundled under the canonical
+  verification-failed code.
+
+### `modules.enable` / `modules.disable` — `editor`, `cli`
+
+Flips the persisted `enabled` flag for an installed module. The flag
+is stored in `<projectRoot>/.forgekit/modules_state.json`, which is
+written atomically (sibling `.tmp` file + rename) so concurrent
+readers never observe a truncated file.
+
+**Params:** `{ "projectRoot": "<absolute path>", "moduleId": "<id>" }`
+
+**Result:**
+
+```json
+{ "module_id": "forgekit_rpg", "enabled": true }
+```
+
+`modules.disable` returns the same shape with `"enabled": false`.
+Calling either tool for a module that is already in the requested
+state is a no-op. An unknown `moduleId` raises `MODULE_NOT_FOUND`
+(`-32005`).
+
+### Licenses and tool exposure
+
+On startup the server reads every `<module_id>.key` file under
+`licenseDir` and derives the set of tool categories to expose beyond
+the base profile. Today a single `forgekit_rpg` license record unlocks
+fifteen RPG subsystem categories — `combat`, `crafting`, `inventory`,
+`stats`, `effects`, `magic`, `equipment`, `progression`, `enemies`,
+`loot`, `spawner`, `chests`, `npc`, `dialog`, `vendor` — in the
+`RPG-only` profile and in `Full`. Malformed or unknown `.key` files
+are skipped with a warning; the server never fails to start because
+of licensing.
+
 ## Beyond v0.1
 
 Tools for Scene, Node, Input, Runtime, Animation, TileMap, Theme,
 Batch/Refactor, Shader, Export, Resource, Physics, 3D Scene, Particle,
 Navigation, Audio, AnimationTree, State Machine, Blend Tree,
-Analysis/Search, Android Deploy, Module Management, Self-Healing, Asset
+Analysis/Search, Android Deploy, Self-Healing, Asset
 Generation, Progression, Enemies, Loot, Spawner, World, NPC, Dialog,
 Vendor, and Visualizer ship across later milestones (v0.2 through
 v1.0). Each of those tools follows the same JSON-RPC 2.0 envelope and
@@ -604,3 +791,175 @@ negative, non-integer, or non-numeric values are rejected with
   frame times. When `samples == 0` all three values are `0.0`.
 - `draw_calls` is the latest sample from the Godot `Performance`
   `RENDER_TOTAL_DRAW_CALLS_IN_FRAME` monitor.
+
+## Visualizer category
+
+The `visualizer.*` tools expose the browser-based scene / module /
+event-bus inspector. The underlying HTTP server binds the first free
+TCP port in `6030-6039` on `127.0.0.1`, serves a force-directed-graph
+HTML page at `/`, and exposes three JSON endpoints: `/api/scene_tree`,
+`/api/module_graph`, `/api/event_bus`. The editor plugin opens the page
+automatically on first use.
+
+### `visualizer.start(port?)`
+
+- **Channel:** `editor`. **Module:** `core`.
+- **Params:**
+  - `port` (optional int) — when provided, the server binds exactly that
+    port instead of scanning the `6030-6039` range. Useful for tests and
+    for CI environments with a fixed port budget.
+- **Result:**
+  - `url` — `http://127.0.0.1:<port>`.
+  - `port` — the chosen port.
+  - `already_running` (optional bool) — `true` when a previous call has
+    already started the server and the port is still bound.
+
+### `visualizer.stop()`
+
+- **Channel:** `editor`. **Module:** `core`.
+- **Params:** `{}`.
+- **Result:** `{"stopped": true}`. Releases the TCP port and erases the
+  `visualizer` entry in `user://mcp_active_port.json`.
+
+### `visualizer.render_scene_tree(scene_path?, format?)`
+
+- **Channel:** `editor`. **Module:** `core`.
+- **Params:**
+  - `scene_path` (optional string) — reserved for forward compatibility.
+    The current implementation ignores this field and serializes the
+    editor's active scene via the injected scene provider.
+  - `format` (optional string) — `"json"` (default) or `"svg"`.
+- **Result (json):** `{nodes: [{id, label, type}], edges: [{from, to}], truncated?}`.
+- **Result (svg):** `{svg: "<svg ...>..."}`, rendered on a simple grid
+  layout without running the force-directed engine.
+
+### `visualizer.render_module_graph(format?)`
+
+- **Channel:** `editor`. **Module:** `core`.
+- **Params:**
+  - `format` (optional string) — `"json"` or `"svg"`.
+- **Result (json):** `{nodes: [{id, version, depends_on}], edges: [{from, to}], truncated?}`.
+  Each edge points from a dependent module to the module it depends on.
+
+### `visualizer.render_event_bus(format?)`
+
+- **Channel:** `editor`. **Module:** `core`.
+- **Params:**
+  - `format` (optional string) — `"json"` or `"svg"`.
+- **Result (json):** `{signals: [{name, payload_types, subscribers: [{object_id, object_class, method}]}], truncated?}`.
+
+## Asset Generation category
+
+The `assetgen.*` tools generate graphical assets through the editor
+plugin. Every write is routed through `McpUndoRedoWrapper` so a single
+Ctrl+Z reverts the file. All four tools live on the `editor` channel
+under the `core` module.
+
+### `assetgen.sprite_from_svg(svg_source, target_path, size?)`
+
+- **Params:**
+  - `svg_source` (string, required) — SVG source text.
+  - `target_path` (string, required) — `res://` path of the PNG to write.
+  - `size` (optional int, default `64`) — edge length in pixels.
+- **Result:** `{target_path, size}`.
+- **Error:** `SVG_RASTERIZE_FAILED` when the SVG source does not parse.
+
+### `assetgen.atlas_pack(source_paths, target_path, max_size?)`
+
+- **Params:**
+  - `source_paths` (array of string, required) — `res://` paths of the
+    source PNGs to pack.
+  - `target_path` (string, required) — `res://` path of the atlas PNG.
+  - `max_size` (optional int, default `1024`) — maximum atlas edge
+    length. Images that exceed this budget abort the pack with
+    `ATLAS_PACK_FAILED`.
+- **Result:** `{target_path, tres_path, placements: [{index, x, y, width, height}]}`.
+  The sibling `<target>.atlas.tres` is saved alongside the atlas PNG
+  inside the same UndoRedo action so Ctrl+Z reverts both files
+  atomically.
+- **Error:** `ASSET_LOAD_FAILED` when any source path cannot be loaded.
+
+### `assetgen.noise_texture(target_path, width, height, noise_type, seed?)`
+
+- **Params:**
+  - `target_path` (string, required).
+  - `width`, `height` (int, required).
+  - `noise_type` (string, required) — `"perlin"`, `"simplex"`, or
+    `"cellular"`. Unknown values fall back to `"perlin"` with a
+    warning.
+  - `seed` (optional int, default `0` meaning randomize) — when
+    `seed == 0` the adapter calls `RandomNumberGenerator.randomize()`
+    and returns the chosen seed in the response so the texture can be
+    reproduced.
+- **Result:** `{target_path, width, height, noise_type, seed}`.
+
+### `assetgen.icon_set(source_svg, target_dir, sizes)`
+
+- **Params:**
+  - `source_svg` (string, required).
+  - `target_dir` (string, required) — `res://` directory that receives
+    one PNG per size.
+  - `sizes` (array of int, required).
+- **Result:** `{target_dir, targets: [{size, path}]}`. Each PNG is saved
+  as `<target_dir>/<size>.png` inside its own UndoRedo action so
+  individual sizes can be rolled back.
+
+## Self-Healing category
+
+The `healing.*` tools let the AI agent reason about test failures and
+attempt repairs with a bounded retry budget. Retry state is kept in
+memory for the editor session and resets on every editor restart.
+
+`ALLOWED_SUGGESTED_ACTIONS = {"inspect_tres", "validate_gdscript",
+"rerun_test", "manual_review"}`.
+
+### `healing.suggest_action(report)`
+
+- **Channel:** `editor`. **Module:** `core`.
+- **Params:** `{report: {status, failure_message?, resource_path?}}`.
+- **Result:** `{suggested_action}` where `suggested_action` is drawn
+  from the allowed set.
+- **Rule set** (first match wins, except when retry budget is
+  exhausted):
+  - `failure_message` contains `.tres` or `ext_resource` →
+    `inspect_tres`.
+  - `failure_message` contains `parse error` or `unexpected token` →
+    `validate_gdscript`.
+  - `failure_message` contains `timeout`, `timed out`, or `flaky` →
+    `rerun_test`.
+  - Otherwise → `manual_review`.
+- **Retry escalation (Property 22):** when the retry counter for
+  `resource_path` is at or above the limit of 3, the rule set is
+  bypassed and the response is always `{"suggested_action": "manual_review"}`.
+
+### `healing.inspect_failure(report_or_message)`
+
+- **Params:** `{report: string | TestReport}`.
+- **Result:** `{root_cause, candidates: [{category, suggestion, confidence}]}`.
+  `confidence` is a float in `[0.0, 1.0]`. At least one candidate is
+  always returned; an unclassified failure falls back to an
+  `investigate` candidate so the agent sees some guidance.
+
+### `healing.get_retry_count(resource_path)`
+
+- **Params:** `{resource_path: string}`.
+- **Result:** `{attempts, limit: 3}`.
+
+### `healing.reset_retry_count(resource_path)`
+
+- **Params:** `{resource_path: string}`.
+- **Result:** `{ok: true}`. Clears the `retry_exhausted` latch so the
+  signal can refire on the next exhaustion.
+
+### `healing.apply_and_retest(fix, test_command)`
+
+- **Params:**
+  - `fix` (object, required) — forwarded to the editor backend's
+    `apply_fix(path, fix)` method. The `path` field of `fix` must be a
+    valid `res://` path.
+  - `test_command` (string, required) — shell command forwarded to the
+    injected test runner.
+- **Result:** `{applied, test_status, retries_remaining}` where
+  `retries_remaining = limit - attempts_after_this_call`. On a failed
+  test run the retry counter is advanced and the `mcp.healing.retries`
+  counter increments through the injected metrics sink.

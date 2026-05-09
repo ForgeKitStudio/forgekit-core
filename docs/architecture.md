@@ -131,6 +131,50 @@ the right channel per tool.
   `runtime.reload_current_scene`, `runtime.handshake`,
   `runtime.heartbeat`.
 
+## Browser Visualizer — optional HTTP preview
+
+A read-only HTTP server on `127.0.0.1` that renders the current edited
+scene as a force-directed graph. It runs inside the editor alongside
+the WebSocket JSON-RPC channel on the first free port in `6030-6039`
+and writes the active port to `user://mcp_active_port.json` under the
+`visualizer` key (atomic temp-file + rename, same rules as the other
+channels).
+
+### Pages
+
+- `GET /` (and `/index.html`) — three-tab browser viewer that switches
+  between the scene tree, the module dependency graph, and the event
+  bus subscriber graph via a shared force-directed layout engine.
+
+### JSON endpoints
+
+The static page fetches its data from three JSON endpoints:
+
+- `GET /api/scene_tree` — `{nodes, edges}` for the edited scene. Nodes
+  are `{id, label, type}`. Responses beyond 1 000 nodes include
+  `truncated: true`.
+- `GET /api/module_graph` — `{nodes, edges}` for the installed
+  ForgeKit modules. Nodes are `{id, version, depends_on}`; edges
+  point from a dependent module to the module it depends on.
+- `GET /api/event_bus` — `{signals}` listing every declared signal on
+  the `GameEvents` autoload with its payload types and current
+  subscribers. Subscribers are `{object_id, object_class?, method}`.
+
+### Notes
+
+- The server is `GET`-only. Any other HTTP method returns
+  `405 Method Not Allowed`. Unknown paths return `404 Not Found`.
+- Binding to a non-loopback `bind_address` (for example `0.0.0.0`)
+  still starts the server but surfaces an `EXTERNAL_BIND_ENABLED`
+  warning so the operator knows visualizer traffic is reachable beyond
+  the local host.
+- The scene-tree provider is injected by the editor plugin at startup.
+  When a provider is not wired up, `/api/scene_tree` returns an empty
+  document (`{nodes: [], edges: []}`) rather than erroring. If the
+  bundled `index.html` is missing, `GET /` still returns `200 OK` with
+  a minimal placeholder page and a `VISUALIZER_INDEX_MISSING` warning
+  is logged.
+
 ## Module consolidation — why `forgekit_rpg` is one module
 
 The paid layer ships as a single module (`addons/forgekit_rpg/`) that
@@ -140,10 +184,14 @@ keeps the publishing and licensing story simple:
 - **One manifest** — `module.manifest.tres` declares `id = "forgekit_rpg"`,
   one `version`, and one `core_min_version`. `modules.check_compatibility`
   only has one row to reason about for the RPG layer.
-- **One license** — `modules.activate_license("forgekit_rpg", <key>)`
+- **One license** — `modules.activate_license("forgekit_rpg", <license_id>, <signature>)`
   verifies a single HMAC-SHA256 license file at
-  `user://licenses/forgekit_rpg.key` and unlocks all four subsystems at
-  once.
+  `user://licenses/forgekit_rpg.key` and unlocks the full set of RPG
+  subsystem tool categories at once — today `combat`, `crafting`,
+  `inventory`, `stats`, `effects`, `magic`, `equipment`,
+  `progression`, `enemies`, `loot`, `spawner`, `chests`, `npc`,
+  `dialog`, and `vendor` (see
+  `mcp-server/src/licensing/startup.ts`).
 - **One CI pipeline** — the private `ForgeKitStudio/forgekit-rpg`
   repository runs a single `ci.yml` covering the whole module, plus an
   `integration-with-core` job that pins against the Core tag listed in

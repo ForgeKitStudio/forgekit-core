@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>ForgeKit Browser Visualizer</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #10141a;
+      color: #e4e7ea;
+      font-family: system-ui, sans-serif;
+    }
+
+    header {
+      padding: 8px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid #2a303a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    nav button {
+      background: #1a202a;
+      color: #9aa5b1;
+      border: 1px solid #2a303a;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    nav button.active {
+      background: #2a323d;
+      color: #e4e7ea;
+      border-color: #4c8df6;
+    }
+
+    svg {
+      width: 100vw;
+      height: calc(100vh - 36px);
+      display: block;
+      cursor: grab;
+    }
+
+    .edge {
+      stroke-width: 1;
+    }
+
+    .node circle {
+      stroke: #0b1220;
+      stroke-width: 1.5;
+      cursor: grab;
+    }
+
+    .node text {
+      fill: #e4e7ea;
+      font-size: 10px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .view-scene .node circle {
+      fill: #4c8df6;
+    }
+
+    .view-scene .edge {
+      stroke: #4a5362;
+    }
+
+    .view-module .node circle {
+      fill: #3bd16f;
+    }
+
+    .view-module .edge {
+      stroke: #2a7a3f;
+    }
+
+    .view-event .node circle {
+      fill: #f5b041;
+    }
+
+    .view-event .edge {
+      stroke: #8a6030;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <nav>
+      <button id="tab-scene" class="active">Scene Tree</button>
+      <button id="tab-module">Module Graph</button>
+      <button id="tab-event">Event Bus</button>
+    </nav>
+    <span id="status">loading…</span>
+  </header>
+  <svg id="canvas" class="view-scene" viewBox="0 0 960 640" preserveAspectRatio="xMidYMid meet">
+    <g id="edges"></g>
+    <g id="nodes"></g>
+  </svg>
+  <script>
+    (function () {
+      var svg = document.getElementById('canvas');
+      var edgesLayer = document.getElementById('edges');
+      var nodesLayer = document.getElementById('nodes');
+      var statusEl = document.getElementById('status');
+      var WIDTH = 960, HEIGHT = 640;
+      var nodes = [];
+      var edges = [];
+      var positions = {};
+
+      var VIEWS = {
+        scene: {
+          endpoint: '/api/scene_tree',
+          className: 'view-scene',
+          label: 'Scene Tree',
+          project: function (doc) { return { nodes: doc.nodes || [], edges: doc.edges || [] }; }
+        },
+        module: {
+          endpoint: '/api/module_graph',
+          className: 'view-module',
+          label: 'Module Graph',
+          project: function (doc) {
+            var n = (doc.nodes || []).map(function (entry) {
+              return { id: entry.id, label: entry.id, version: entry.version };
+            });
+            return { nodes: n, edges: doc.edges || [] };
+          }
+        },
+        event: {
+          endpoint: '/api/event_bus',
+          className: 'view-event',
+          label: 'Event Bus',
+          project: function (doc) {
+            var out = { nodes: [], edges: [] };
+            var signals = doc.signals || [];
+            for (var i = 0; i < signals.length; i++) {
+              var sig = signals[i];
+              out.nodes.push({ id: sig.name, label: sig.name });
+              var subs = sig.subscribers || [];
+              for (var j = 0; j < subs.length; j++) {
+                var sub = subs[j];
+                var subId = sig.name + '::' + (sub.object_id || '') + '.' + (sub.method || '');
+                var subLabel = (sub.object_class || sub.object_id || '') + '.' + (sub.method || '');
+                out.nodes.push({ id: subId, label: subLabel });
+                out.edges.push({ from: sig.name, to: subId });
+              }
+            }
+            return out;
+          }
+        }
+      };
+
+      var currentView = 'scene';
+
+      function fetchView(view) {
+        return fetch(VIEWS[view].endpoint).then(function (r) { return r.json(); });
+      }
+
+      function initPositions(list) {
+        var n = list.length || 1;
+        for (var i = 0; i < list.length; i++) {
+          var id = list[i].id;
+          if (!positions[id]) {
+            var angle = (i / n) * Math.PI * 2;
+            positions[id] = {
+              x: WIDTH / 2 + Math.cos(angle) * 180,
+              y: HEIGHT / 2 + Math.sin(angle) * 180,
+              vx: 0,
+              vy: 0
+            };
+          }
+        }
+      }
+
+      function step() {
+        var REP = 3200;
+        var SPRING = 0.02;
+        var LEN = 80;
+        var DAMP = 0.82;
+        for (var i = 0; i < nodes.length; i++) {
+          var a = positions[nodes[i].id];
+          for (var j = i + 1; j < nodes.length; j++) {
+            var b = positions[nodes[j].id];
+            var dx = a.x - b.x, dy = a.y - b.y;
+            var d2 = dx * dx + dy * dy + 0.01;
+            var f = REP / d2;
+            var d = Math.sqrt(d2);
+            var fx = (dx / d) * f, fy = (dy / d) * f;
+            a.vx += fx; a.vy += fy;
+            b.vx -= fx; b.vy -= fy;
+          }
+        }
+        for (var k = 0; k < edges.length; k++) {
+          var p = positions[edges[k].from];
+          var q = positions[edges[k].to];
+          if (!p || !q) continue;
+          var ex = q.x - p.x, ey = q.y - p.y;
+          var ed = Math.sqrt(ex * ex + ey * ey) || 0.01;
+          var diff = ed - LEN;
+          var sx = (ex / ed) * diff * SPRING;
+          var sy = (ey / ed) * diff * SPRING;
+          p.vx += sx; p.vy += sy;
+          q.vx -= sx; q.vy -= sy;
+        }
+        for (var m = 0; m < nodes.length; m++) {
+          var pos = positions[nodes[m].id];
+          pos.vx *= DAMP; pos.vy *= DAMP;
+          pos.x += pos.vx; pos.y += pos.vy;
+          if (pos.x < 20) pos.x = 20; if (pos.x > WIDTH - 20) pos.x = WIDTH - 20;
+          if (pos.y < 20) pos.y = 20; if (pos.y > HEIGHT - 20) pos.y = HEIGHT - 20;
+        }
+      }
+
+      function render() {
+        while (edgesLayer.firstChild) edgesLayer.removeChild(edgesLayer.firstChild);
+        while (nodesLayer.firstChild) nodesLayer.removeChild(nodesLayer.firstChild);
+        for (var i = 0; i < edges.length; i++) {
+          var p = positions[edges[i].from];
+          var q = positions[edges[i].to];
+          if (!p || !q) continue;
+          var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('class', 'edge');
+          line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+          line.setAttribute('x2', q.x); line.setAttribute('y2', q.y);
+          edgesLayer.appendChild(line);
+        }
+        for (var j = 0; j < nodes.length; j++) {
+          var n = nodes[j];
+          var pos = positions[n.id];
+          var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.setAttribute('class', 'node');
+          g.setAttribute('transform', 'translate(' + pos.x + ',' + pos.y + ')');
+          var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          c.setAttribute('r', 6);
+          g.appendChild(c);
+          var t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          t.setAttribute('x', 9); t.setAttribute('y', 3);
+          t.textContent = n.label;
+          g.appendChild(t);
+          nodesLayer.appendChild(g);
+        }
+      }
+
+      function loop() {
+        step();
+        render();
+        requestAnimationFrame(loop);
+      }
+
+      function refresh() {
+        var view = VIEWS[currentView];
+        fetchView(currentView).then(function (doc) {
+          var projected = view.project(doc);
+          nodes = projected.nodes;
+          edges = projected.edges;
+          initPositions(nodes);
+          statusEl.textContent = view.label + ': ' + nodes.length + ' nodes, ' + edges.length + ' edges' + (doc.truncated ? ' (truncated)' : '');
+        }).catch(function (e) {
+          statusEl.textContent = 'error: ' + e;
+        });
+      }
+
+      function selectView(view) {
+        currentView = view;
+        positions = {};
+        svg.setAttribute('class', VIEWS[view].className);
+        document.getElementById('tab-scene').classList.toggle('active', view === 'scene');
+        document.getElementById('tab-module').classList.toggle('active', view === 'module');
+        document.getElementById('tab-event').classList.toggle('active', view === 'event');
+        refresh();
+      }
+
+      document.getElementById('tab-scene').addEventListener('click', function () { selectView('scene'); });
+      document.getElementById('tab-module').addEventListener('click', function () { selectView('module'); });
+      document.getElementById('tab-event').addEventListener('click', function () { selectView('event'); });
+
+      selectView('scene');
+      setInterval(refresh, 2000);
+      loop();
+    })();
+  </script>
+</body>
+
+</html>
