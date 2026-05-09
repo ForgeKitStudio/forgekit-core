@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "description": "Skeleton tool profile definitions for @forgekit/core-mcp. Populated with a representative subset of tools; the full 215-tool surface is added in later phases.",
+  "description": "Skeleton tool profile definitions for @forgekitstudio/core-mcp. Populated with a representative subset of tools; the full 215-tool surface is added in later phases.",
   "tools": [
     {
       "name": "project.info",
@@ -10,6 +10,36 @@
     },
     {
       "name": "project.list_modules",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.list_workspaces",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.switch",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.add",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.remove",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.get_active",
       "scope": "core",
       "channel": "editor",
       "module": "core-minimal"

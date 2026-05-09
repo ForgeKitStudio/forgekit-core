@@ -185,3 +185,28 @@ func test_hoists_trace_id_and_span_id_to_top_level() -> void:
 	assert_eq(String(entry.get("span_id", "")), "0001", "span_id must be hoisted to top-level")
 	assert_eq(String(entry.get("method", "")), "project.info", "method must be hoisted to top-level")
 	assert_eq(int(entry.get("duration_ms", 0)), 12, "duration_ms must be hoisted to top-level")
+
+
+# ---------------------------------------------------------------------------
+# 6) workspace_id is hoisted to the top level alongside trace_id (Phase 7).
+# ---------------------------------------------------------------------------
+
+func test_hoists_workspace_id_to_top_level() -> void:
+	var logger: Object = _new_logger(&"info")
+	_set_clock(logger, "2026-05-16T12:00:00.000Z")
+
+	logger.log(&"info", &"editor_plugin", {
+		"trace_id": "abcd1234",
+		"workspace_id": "client-a",
+		"payload_hint": "goes to data",
+	})
+
+	var file_path: String = _scratch_base.path_join("editor_plugin/2026-05-16.jsonl")
+	var lines: Array = _read_lines(file_path)
+	assert_eq(lines.size(), 1, "One line expected")
+	var entry: Dictionary = lines[0] as Dictionary
+	assert_eq(String(entry.get("workspace_id", "")), "client-a", "workspace_id must be hoisted to top-level")
+	assert_eq(String(entry.get("trace_id", "")), "abcd1234", "trace_id must also be hoisted")
+	var data: Dictionary = entry.get("data", {}) as Dictionary
+	assert_true(data.has("payload_hint"), "Non-reserved keys stay nested under data")
+	assert_false(data.has("workspace_id"), "Reserved keys must not leak into data")

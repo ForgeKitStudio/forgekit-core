@@ -39,7 +39,7 @@ const _LEVEL_ORDER: Dictionary = {
 	&"error": 3,
 }
 
-const _RESERVED_FIELDS: Array = ["trace_id", "span_id", "method", "duration_ms"]
+const _RESERVED_FIELDS: Array = ["trace_id", "span_id", "method", "duration_ms", "workspace_id"]
 
 
 var base_dir: String = DEFAULT_BASE_DIR

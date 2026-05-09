@@ -39,6 +39,7 @@ const RESERVED_FIELDS: readonly string[] = [
   'span_id',
   'method',
   'duration_ms',
+  'workspace_id',
 ];
 
 /** Constructor options for JsonlLogger. */
