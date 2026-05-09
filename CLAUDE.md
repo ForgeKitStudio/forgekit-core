@@ -137,8 +137,44 @@ Phase 5 adds three subtrees alongside the existing `tools/` directory:
   `healing.*` MCP tools. Limits retries to 3 per resource per session;
   escalates to `manual_review` on exhaustion (Property 22).
 
+Phase 6A adds twelve editor-channel categories as thin adapter files
+under `tools/`: `animation_tools.gd`, `tilemap_tools.gd`,
+`theme_ui_tools.gd`, `shader_tools.gd`, `physics_tools.gd`,
+`scene3d_tools.gd`, `particle_tools.gd`, `navigation_tools.gd`,
+`audio_tools.gd`, `animation_tree_tools.gd`, `state_machine_tools.gd`,
+`blend_tree_tools.gd`. Every mutating tool routes through
+`McpUndoRedoWrapper`; the three tools that touch `project.godot`
+(`physics.set_gravity`, `physics.configure_layer`,
+`navigation.configure_layers`) go through
+`McpProjectSettingsAtomicWriter` for atomic
+read → parse → modify → write-temp → fsync → rename writes.
+
 The adapters are wired in through `plugin_lifecycle.gd` via optional
 factory Callables so headless tests can inject fakes.
+
+Phase 6B extends `McpJsonRpcDispatcher` with two observability
+concerns. The dispatcher now reads a `_forgekit_trace` envelope from
+each incoming request (transport-supplied `{trace_id, span_id}` pair)
+and mints a fresh 8-char / 4-char lowercase hex pair when the
+envelope is absent. The latest pair is readable through
+`get_last_trace_context()` so the WebSocket server can forward the
+same `trace_id` to `McpJsonlLogger.log(...)`. The dispatcher also
+exposes `set_metrics_sink(Callable)`: when registered, the sink
+receives one `mcp.requests.total` increment per dispatch and an
+additional `mcp.requests.errors` increment when the response is a
+JSON-RPC error envelope.
+
+Phase 6B also adds `McpUpdateChecker` at
+`addons/forgekit_core/mcp/editor_plugin/update_checker.gd`. The
+checker polls
+`https://api.github.com/repos/ForgeKitStudio/forgekit-core/releases/latest`
+at most once per hour (rate-limit cache lives under
+`user://mcp_update_check.json`), compares the returned `tag_name`
+to the running Core version, and formats a single
+`UPDATE_AVAILABLE: ForgeKit Core v<new> available (running v<current>).
+Run 'npx -y @forgekit/core-mcp@latest' to upgrade.` line for
+`editor.get_output_log`. The HTTP client is injected so the checker
+runs headlessly under tests and silently no-ops on network failure.
 
 ## MCP runtime bridge
 
@@ -147,6 +183,26 @@ Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
 registered in `project.godot` and exposes the runtime surface to the MCP
 server over a local transport. Like the editor plugin, this tree is
 read-only for agents and expands in later phases.
+
+Phase 6A adds four runtime-channel adapter files under
+`runtime_bridge/tools/`: `physics_runtime_tools.gd` (raycast, shape_cast,
+query_point against the active `PhysicsDirectSpaceState`),
+`navigation_runtime_tools.gd` (find_path, debug_draw via
+`NavigationServer`), `audio_runtime_tools.gd` (play_stream, stop_stream
+against `AudioStreamPlayer`), and `state_machine_runtime_tools.gd`
+(travel, get_current on
+`AnimationNodeStateMachinePlayback`). These tools only respond when the
+game was launched with the `--mcp-bridge` CLI flag.
+
+Phase 6B extends `McpBridge` with trace propagation. The UDP server
+calls `McpBridge.observe_packet(request)` once per accepted packet;
+when the parsed JSON-RPC envelope carries a `trace` field with
+`{trace_id, span_id}` (both 8-char / 4-char lowercase hex), the
+bridge echoes the pair through `get_last_trace_context()`, so
+downstream log lines emitted by `McpJsonlLogger.log(...)` carry the
+same identifier that appears on the editor and server channels.
+Missing or malformed envelopes are replaced with a freshly minted
+pair so every packet stays correlatable.
 
 ## MCP licensing
 
@@ -166,7 +222,7 @@ hook accepts the commit. Per-tool documentation and transport details live
 in `docs/mcp_api.md`.
 
 As of the `Unreleased` block in `CHANGELOG.md`, the `core`-scoped surface
-includes three new editor-channel categories added by Phase 5:
+includes three editor-channel categories added by Phase 5:
 
 - **Visualizer** — `visualizer.start`, `visualizer.stop`,
   `visualizer.render_scene_tree`, `visualizer.render_module_graph`,
@@ -181,6 +237,27 @@ includes three new editor-channel categories added by Phase 5:
   set (`inspect_tres`, `validate_gdscript`, `rerun_test`,
   `manual_review`) between the GDScript implementation and the
   TypeScript port under `mcp-server/src/healing/suggest_action.ts`.
+
+Phase 6A adds two CLI-channel categories that live entirely on the
+server side under `mcp-server/src/tools/`:
+
+- **Export** — `export.list_presets`, `export.run_preset`,
+  `export.validate_preset`. The run tool spawns
+  `godot --headless --export-release` (or `--export-debug`) through the
+  shared `SpawnGodot` helper at `src/tools/testing/spawn_godot.ts`. All
+  three tools read `export_presets.cfg` through a narrow INI parser at
+  `src/tools/export/presets_parser.ts`.
+- **Android Deploy** — `android.list_devices`, `android.install_apk`,
+  `android.run_logcat`. Wraps the `adb` binary resolved from `ADB_BIN`
+  at call time through `src/tools/android/spawn_adb.ts`.
+
+Phase 6A also adds twelve editor-channel categories implemented as
+GDScript adapters under `addons/forgekit_core/mcp/editor_plugin/tools/`
+(see the **MCP editor plugin** section above) and four runtime-channel
+adapters under `addons/forgekit_core/mcp/runtime_bridge/tools/`. The
+server-side profile filter picks them up from `profiles.json` so no
+server-side code changes are required to expose the new Godot-side
+tools.
 
 The `ToolModule` union in `mcp-server/src/profiles.ts` enumerates every
 module id recognized by the profile filter. As of v0.7.0 it covers
@@ -200,6 +277,79 @@ the compiled hook scripts. Changing the tsconfig `rootDir` or moving the CLI
 entry file requires updating the `..` count and the regression test in
 `test/cli_install_hooks.test.ts` (the test runs the compiled binary against
 a tmp git repo and asserts the shim points at an existing module).
+
+**Release-pipeline helper port**: `mcp-server/src/verify_manifest_tag.ts`
+mirrors the pure helpers from `forgekit-rpg/tools/verify-manifest-tag.js`
+(the release-pipeline `MANIFEST_TAG_NOT_FOUND` gate) so the Core property
+test `test/property_tag_compatibility.test.ts` can exercise
+`isValidCoreMinVersion` and `buildTagRefUrl` without a cross-repository
+import. Keep the two copies byte-for-byte aligned — the `forgekit-rpg`
+shell script is the canonical runtime and this file is the canonical
+test subject.
+
+## Observability
+
+The MCP server exposes structured logs, a trace id that follows every
+JSON-RPC request end-to-end, and an in-memory metrics registry.
+
+- **JSON Lines log stream.** `mcp-server/src/observability/jsonl_logger.ts`
+  (class `JsonlLogger`) writes one line per event under
+  `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`. The line shape is shared
+  with the Godot side (`addons/forgekit_core/mcp/observability/jsonl_logger.gd`):
+  `{ts, level, component, trace_id?, span_id?, method?, duration_ms?, data?}`.
+  The minimum level is controlled by the `--mcp-log-level` CLI flag
+  (parsed by `parseCliArgs` in `src/index.ts`); lines below the
+  threshold are dropped. Files rotate by UTC date; no size-based
+  rotation in this phase.
+- **Trace ids.** `mcp-server/src/observability/trace.ts` exports
+  `generateTraceId()` (8-char lowercase hex), `generateSpanId()`
+  (4-char lowercase hex), and `newTraceContext()` which returns a
+  fresh `{trace_id, span_id}` pair. The JSON-RPC dispatcher reads a
+  `_forgekit_trace` envelope from incoming WebSocket frames; the UDP
+  runtime bridge reads a top-level `trace` field. When either is
+  absent the server mints a fresh pair so every request is
+  correlatable across both streams.
+- **Metrics registry.** `mcp-server/src/observability/metrics.ts`
+  (class `MetricsRegistry`) offers an idempotent named registry of
+  `Counter` and `Histogram` instances. The canonical names declared
+  as exported constants match the ones tracked by the health endpoint
+  and the Godot side:
+  `mcp.requests.total`, `mcp.requests.errors`,
+  `mcp.requests.duration_ms`, `mcp.heartbeat.drops`,
+  `mcp.reconnect.attempts`, `mcp.reconnect.backoff_ms`,
+  `mcp.editor_plugin.undo_stack_size`,
+  `mcp.runtime_bridge.udp_packets.received`,
+  `mcp.runtime_bridge.udp_packets.rejected`,
+  `mcp.healing.retries`. `registerCanonicalMetrics(registry)` registers
+  the full set in one call. Histograms keep a rolling window of the
+  most recent 1000 samples and report `count`, `sum`, `p50`, `p95`,
+  `p99` via `snapshot()` using the nearest-rank percentile rule.
+  The `mcp.editor_plugin.undo_stack_size` gauge is declared but
+  not yet wired — the `UndoRedoWrapper` has no stack-size signal to
+  subscribe to, so the delta emission is deferred to a future pass.
+- **Health endpoint.** `mcp-server/src/health_endpoint.ts` (class
+  `HealthEndpoint`) binds the first free port in `6040-6049` on
+  `127.0.0.1` and merges the chosen port into `mcp_active_port.json`
+  under the `"health"` key. Four read-only routes:
+    - `GET /health` — `{status, checks: {editor, runtime, cli}}`.
+    - `GET /metrics` — Prometheus text rendering of the canonical
+      counter + histogram surface. Metric names with dots are
+      translated to underscores (`mcp.requests.total` →
+      `mcp_requests_total`).
+    - `GET /version` — `{server, core_detected, api_version}`;
+      `core_detected` resolves from `git describe --tags
+      --abbrev=0` at the project root and falls back to `"unknown"`.
+    - `GET /trace/:trace_id` — the last 100 JSONL entries matching
+      `trace_id`, scanning the last 7 days of log files and sorted
+      by `ts` ascending.
+- **Update channel.** `mcp-server/src/tools/runtime_bridge/handshake.ts`
+  exposes `readLatestVersionFromCache(path)`, which reads the
+  `mcp_update_check.json` cache written by the editor-plugin's
+  `McpUpdateChecker` and returns the latest version string when an
+  update is available (or `null` otherwise). The runtime bridge uses
+  this to populate the `server.latest_version` field of the
+  `runtime.handshake` response. See the **Updating** section of
+  `README.md` for the end-user-facing upgrade command.
 
 ## Git hooks
 

@@ -77,6 +77,29 @@ the right channel per tool.
   `node.set_property`, `resource.load`, `resource.save`,
   `resource.inspect`, `transaction.begin` / `commit` / `rollback`,
   `gdscript.save_with_validation`, `project.list_modules`.
+- **Update notifications.** The plugin runs a periodic, rate-limited
+  poll against the GitHub `releases/latest` endpoint of
+  `ForgeKitStudio/forgekit-core`. When a newer Core version is
+  detected, a single `UPDATE_AVAILABLE: ForgeKit Core v<new> available
+  (running v<current>). Run 'npx -y @forgekit/core-mcp@latest' to
+  upgrade.` line is appended to `editor.get_output_log`, so MCP
+  clients that scrape the editor log stream surface the notice
+  without any extra wiring. Polls are throttled to once per hour via
+  a cache at `user://mcp_update_check.json`, and network failures are
+  swallowed silently (no update is advertised, and the cache is only
+  written on a successful fetch).
+- **Tool-category adapters registered at startup.** On `_enter_tree`
+  the plugin's lifecycle helper (`McpEditorPluginLifecycle`) registers
+  each editor-channel tool family on the JSON-RPC dispatcher through a
+  dedicated adapter factory. Twelve adapter families cover the
+  authoring surface: `animation`, `tilemap`, `theme`/`ui`, `shader`,
+  `physics`, `scene3d`, `particle`, `navigation`, `audio`,
+  `animation_tree`, `state_machine`, and `blend_tree`. Each factory is
+  injectable, so headless tests drive the lifecycle against
+  in-memory fakes without opening real sockets. A lifecycle that only
+  wires the WebSocket server (no dispatcher, no adapter factories)
+  still starts and stops cleanly — the adapter registration is a pure
+  extension.
 
 ### 2. CLI headless — spawn `godot --headless`
 
@@ -89,7 +112,15 @@ the right channel per tool.
 - **Runs inside:** a short-lived Godot process with no graphical editor.
 - **Typical tools:** `tests.run_unit`, `tests.run_suite`,
   `tests.run_gameplay`, `tests.run_property`, `gdscript.validate`,
-  `project.check_imports`.
+  `project.check_imports`, `export.list_presets`, `export.run_preset`,
+  `export.validate_preset`, `android.list_devices`,
+  `android.install_apk`, `android.run_logcat`.
+- **Server-side-only categories.** Two CLI-channel families — `export`
+  and `android` — have no Godot-side adapter. They live entirely in
+  `mcp-server/src/tools/export/` and `mcp-server/src/tools/android/`,
+  shelling out to `godot --headless --export-release` / `--export-debug`
+  and to `adb` respectively. They read `export_presets.cfg` directly
+  from disk rather than going through the editor plugin.
 - **Why it exists:** CI, pre-commit validation, and property tests must
   run without an open editor session, and they must report results in a
   shape the self-healing loop can parse.
@@ -120,6 +151,19 @@ the right channel per tool.
   `PACKET_TOO_LARGE`.
 - **Runs inside:** the running game, via the `McpBridge` autoload
   registered by ForgeKit Core.
+- **Trace context per datagram.** The `McpBridge` autoload exposes two
+  GDScript methods that anchor the runtime side of the shared
+  `trace_id` pipeline. `observe_packet(request)` is invoked once per
+  accepted UDP datagram with the parsed JSON-RPC envelope: when the
+  envelope carries a `trace` field of the form
+  `{ "trace_id": "<8 lowercase hex>", "span_id": "<4 lowercase hex>" }`
+  the bridge echoes that pair; otherwise it mints a fresh pair in the
+  same shape so every packet stays correlatable even when the sender
+  omits a trace envelope. `get_last_trace_context()` returns the pair
+  attached to the most recent observation as a duplicated dictionary
+  (`{}` before the first call), so downstream log and telemetry code
+  can tag engine-side log lines with the same `trace_id` that appears
+  on the server and editor channels.
 - **Mutation safety:** runtime tools do not touch on-disk state, so the
   Undo stack does not apply. `runtime.eval_safe` only evaluates the
   closed grammar implemented by `Smart_Type_Parser`; it never calls
@@ -129,7 +173,136 @@ the right channel per tool.
   `scene.get_tree_snapshot`, `runtime.get_scene_tree`,
   `runtime.get_current_scene`, `runtime.change_scene`,
   `runtime.reload_current_scene`, `runtime.handshake`,
-  `runtime.heartbeat`.
+  `runtime.heartbeat`, `physics.raycast`, `physics.shape_cast`,
+  `physics.query_point`, `navigation.find_path`,
+  `navigation.debug_draw`, `audio.play_stream`, `audio.stop_stream`,
+  `state_machine.travel`, `state_machine.get_current`.
+- **Runtime-channel adapter families.** Alongside the MVP runtime
+  tools, the bridge registers four Phase 6A adapter families under
+  `addons/forgekit_core/mcp/runtime_bridge/tools/`: `physics` (three
+  spatial queries against `PhysicsDirectSpaceState`), `navigation`
+  (pathfinding and debug draw), `audio` (stream playback), and
+  `state_machine` (`AnimationNodeStateMachinePlayback` control). The
+  server-side profile filter exposes these tools without any
+  server-side code changes — they are pure Godot-side adapters
+  selected by `profiles.json`.
+
+## Structured logging
+
+Both the MCP server (Node.js) and the Godot side write their own
+events as JSON Lines so operators can grep, tail, and correlate them
+with traces emitted by the other channels. The two sides share one
+wire format; only the destination differs.
+
+### Shared line shape
+
+Each line is a self-contained JSON object:
+
+```json
+{
+  "ts": "2026-05-09T12:34:56.000Z",
+  "level": "info",
+  "component": "<component name>",
+  "trace_id": "<optional>",
+  "span_id": "<optional>",
+  "method": "<optional JSON-RPC method>",
+  "duration_ms": 0,
+  "data": { "<caller fields>": "<...>" }
+}
+```
+
+`ts`, `level`, and `component` are always present. `trace_id`,
+`span_id`, `method`, and `duration_ms` are promoted to the top level
+when the caller supplies them so they remain easy to filter on. Every
+other caller-supplied field is nested under `data`.
+
+The `trace_id` is the same identifier propagated across the three MCP
+channels, so a single request can be followed from the agent through
+the server into the editor plugin or the runtime bridge by grepping
+one field.
+
+### Server side — `@forgekit/core-mcp`
+
+- **Destination.** One file per UTC day at
+  `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`. The directory is created
+  on the first write.
+- **Default level.** `info`. Events below the configured level are
+  dropped silently.
+
+### Godot side — `McpJsonlLogger`
+
+- **Class.** `McpJsonlLogger` (`addons/forgekit_core/mcp/observability/jsonl_logger.gd`).
+  A `RefCounted` helper any Godot-side component can instantiate and
+  call as `logger.log(level, component, data)`.
+- **Destination.** `<base_dir>/<component>/<YYYY-MM-DD>.jsonl`, where
+  `base_dir` defaults to `user://mcp_logs`. The component
+  sub-directory is created recursively on first write, so each logical
+  source (`editor_plugin`, `runtime_bridge`, ...) gets its own stream.
+- **Rotation.** Files rotate by UTC date derived from the `ts` field,
+  so a log call at `23:59:58Z` and one at `00:00:02Z` the next day
+  land in different files without any runtime bookkeeping.
+- **Default level.** `info`. The level can be overridden per instance
+  by assigning to the `level` property, or globally at construction
+  time through the `FORGEKIT_MCP_LOG_LEVEL` environment variable
+  (`debug | info | warn | error`). Lines below the configured
+  threshold are dropped silently.
+- **Timestamp format.** ISO-8601 UTC with millisecond resolution and a
+  `Z` suffix (for example `2026-05-16T18:12:33.540Z`), matching the
+  server side's `Date.toISOString()` output.
+
+## Metrics
+
+Both the MCP server and the Godot-side JSON-RPC dispatcher emit
+counter-style metrics for every handled request. The two sides share
+one set of canonical counter names so a single dashboard can total
+requests across the editor plugin, the runtime bridge, and the server
+transport.
+
+### Canonical counter names
+
+| Name                     | Increments on                                            |
+| ------------------------ | -------------------------------------------------------- |
+| `mcp.requests.total`     | every dispatch (success, error, or notification ack)     |
+| `mcp.requests.errors`    | every dispatch that returns a JSON-RPC error envelope    |
+
+`mcp.requests.total` is always incremented first, and
+`mcp.requests.errors` is incremented alongside it when the response is
+an error. A dispatch that returns an empty dictionary (a notification
+without a reply) still counts as a success against
+`mcp.requests.total`.
+
+### Server side — `@forgekit/core-mcp`
+
+The canonical names are exported from
+`mcp-server/src/observability/metrics.ts` as
+`METRIC_REQUESTS_TOTAL` and `METRIC_REQUESTS_ERRORS`, alongside
+`METRIC_REQUESTS_DURATION_MS` and the heartbeat / reconnect counters.
+The server's `MetricsRegistry` owns the actual `Counter` instances;
+downstream code obtains them by name through
+`registerCounter(name)`. See
+[`mcp_api.md` &sect; Observability](mcp_api.md#observability) for the
+full metric inventory (including UDP packet, self-healing, and undo
+stack counters) and the histogram percentile contract.
+
+### Godot side — `McpJsonRpcDispatcher`
+
+- **Class.** `McpJsonRpcDispatcher`
+  (`addons/forgekit_core/mcp/editor_plugin/json_rpc_dispatcher.gd`).
+  The dispatcher's `set_metrics_sink(callable)` method installs an
+  optional sink invoked as `sink.call(name, delta)` on every
+  dispatch.
+- **Emission.** The sink fires once per dispatch with
+  `("mcp.requests.total", 1)`, and again with
+  `("mcp.requests.errors", 1)` when the response carries a JSON-RPC
+  `error` envelope. Registering an empty `Callable` unregisters the
+  sink; when no sink is installed the dispatcher silently skips
+  emission.
+- **Injection pattern.** The sink is a `Callable` rather than an
+  object reference so tests and the editor-plugin lifecycle can wire
+  any object that exposes a single
+  `(name: String, delta: int) -> void` method — for example the
+  server's forwarding sink that funnels Godot-side counters into the
+  same `MetricsRegistry` as the TypeScript side.
 
 ## Browser Visualizer — optional HTTP preview
 
@@ -174,6 +347,159 @@ The static page fetches its data from three JSON endpoints:
   bundled `index.html` is missing, `GET /` still returns `200 OK` with
   a minimal placeholder page and a `VISUALIZER_INDEX_MISSING` warning
   is logged.
+
+## System overview
+
+The diagram below shows the end-to-end architecture that has landed
+across Phases 0–6: the three MCP channels, the cross-cutting Event
+Bus, the Phase 5 authoring subsystems (browser visualizer, asset
+generator, self-healing loop), and the Phase 6 observability layer
+(structured JSONL logs, metrics, health endpoint).
+
+```mermaid
+graph LR
+    Agent[AI Agent<br/>LLM client]
+    CLI[CLI<br/>forgekit-mcp --stdio]
+    Server[MCP Server<br/>&#64;forgekit/core-mcp]
+    Editor[Editor Plugin<br/>WebSocket 6010-6019]
+    Visualizer[Browser Visualizer<br/>HTTP 6030-6039]
+    AssetGen[Asset Generator<br/>editor adapter]
+    Healing[Self-Healing Loop<br/>editor adapter]
+    Runtime[Runtime Bridge<br/>UDP 6020-6029]
+    Health[Health endpoint<br/>HTTP 6040-6049]
+    GodotEditor[Godot editor]
+    GodotGame[Godot game process]
+    EventBus[GameEvents autoload<br/>event bus]
+    Logs[JSONL logs<br/>$HOME/.forgekit/logs/<br/>user://mcp_logs/]
+
+    Agent <-->|stdio JSON-RPC 2.0| Server
+    CLI -->|spawn godot --headless| GodotEditor
+    Server <-->|WebSocket JSON-RPC 2.0| Editor
+    Server <-->|UDP JSON-RPC| Runtime
+    Server -->|spawn godot --headless| GodotEditor
+    Server -->|HTTP GET| Health
+
+    Editor --> GodotEditor
+    Editor --> Visualizer
+    Editor --> AssetGen
+    Editor --> Healing
+    Runtime --> GodotGame
+
+    GodotEditor --> EventBus
+    GodotGame --> EventBus
+
+    Server --> Logs
+    Editor --> Logs
+    Runtime --> Logs
+```
+
+The Event Bus (`GameEvents` autoload) is cross-cutting: every
+subsystem that needs to react to gameplay or authoring events wires
+itself to a declared signal rather than reaching into another
+subsystem's internals. The JSONL logs in `$HOME/.forgekit/logs/`
+(server side) and `user://mcp_logs/<component>/` (Godot side) share
+one line shape so a single `trace_id` can be grepped across all
+three channels.
+
+## Module layout
+
+The repository splits ForgeKit into two addons on the Godot side and
+one Node.js package on the server side:
+
+### `addons/forgekit_core/`
+
+- `event_bus/` — `GameEvents` autoload with the declared signal
+  schema.
+- `resources/` — base resource classes (`ItemResource`,
+  `RecipeResource`, `EquipableItemResource`).
+- `manifest/` — module manifest loader backing `project.list_modules`.
+- `mcp/editor_plugin/` — editor plugin entry point, WebSocket
+  server, JSON-RPC dispatcher, UndoRedo wrapper, project-settings
+  atomic writer, visualizer HTTP server, asset-generator tools,
+  self-healing tools, and the twelve Phase 6A adapter families
+  (animation, tilemap, theme/ui, shader, physics, scene3d, particle,
+  navigation, audio, animation_tree, state_machine, blend_tree).
+- `mcp/runtime_bridge/` — `McpBridge` autoload, UDP server, runtime
+  adapter families for the MVP tools plus Phase 6A runtime categories
+  (physics, navigation, audio, state_machine).
+- `mcp/licensing/` — HMAC-SHA256 license store, license activator,
+  and the canonical `license_id` → tool-category mapping.
+- `mcp/observability/` — `McpJsonlLogger`, trace-id plumbing, and
+  the metrics-sink hook wired through the dispatcher.
+- `testing/` — `TestReport` shape, CoreFuzz fuzzer.
+- `tools/` — headless CLI adapters used by the CI runner.
+
+### `addons/forgekit_rpg/` (paid, optional)
+
+Shipped separately from `ForgeKitStudio/forgekit-rpg`. The consumer
+drops the signed ZIP into this directory; ForgeKit Core detects the
+manifest at startup and exposes the additional tool categories once
+`modules.activate_license` verifies the HMAC signature.
+
+### `mcp-server/src/`
+
+- `index.ts` — CLI entry point, stdio bridge, profile selection.
+- `stdio_bridge.ts` — stdio transport for MCP clients.
+- `port_scanner.ts` — scans the 6010-6019 / 6020-6029 / 6030-6039 /
+  6040-6049 ranges for free ports.
+- `auto_reconnect.ts`, `auth_verifier.ts`, `bind_warning.ts` —
+  cross-cutting behaviours shared by every channel.
+- `health_endpoint.ts` — `/health`, `/metrics`, `/version`,
+  `/trace/:trace_id` HTTP server.
+- `metrics.ts` — metrics registry and canonical counter / histogram
+  names.
+- `observability/` — JSONL logger, trace-id generator, and the
+  server-side metrics registry.
+- `tools/` — per-category server-side adapters. Editor-channel tools
+  mostly forward to the Godot-side adapters above; CLI-channel
+  categories (`export/`, `android/`, `project/`, `testing/`) and a
+  few `modules/` tools implement the logic directly.
+- `healing/` — server-side `suggest_action` + `resource_inspect`
+  implementations shared with the editor adapters.
+- `licensing/` — license-directory scanner that translates installed
+  `<module_id>.key` files into unlocked tool categories.
+- `verify_manifest_tag.ts` — port of the `forgekit-rpg` release
+  pipeline helpers used by Property 34.
+
+## End-to-end: crafting test + healing fix
+
+The sequence diagram below shows the full Phase 5 self-healing loop
+driven by an AI agent. The agent runs a crafting gameplay test,
+observes a failure report, inspects the offending `.tres`, and
+applies a suggested fix — all through the MCP server.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as AI Agent
+    participant Server as MCP Server
+    participant Editor as Editor Plugin
+    participant CLI as godot --headless
+    participant Runtime as Runtime Bridge
+    participant Heal as Self-Healing
+
+    Agent->>Server: tests.run_gameplay<br/>scene=crafting.tscn<br/>steps=[add:iron_ore:2, craft:iron_ingot]
+    Server->>CLI: spawn --mcp-bridge<br/>--mcp-bridge-steps=...
+    CLI->>Runtime: open UDP 6020-6029
+    Runtime-->>CLI: inventory.add_item / crafting.execute
+    CLI-->>Server: TestReport JSON<br/>(failed=1, suggested_action=inspect_tres)
+    Server-->>Agent: TestReport
+    Agent->>Server: healing.inspect_failure<br/>report=<TestReport>
+    Server->>Heal: analyse failing case
+    Heal-->>Server: suggested_fix { path, patch }
+    Server-->>Agent: { suggested_fix }
+    Agent->>Server: healing.apply_and_retest<br/>fix=<suggested_fix>
+    Server->>Editor: resource.apply_fix<br/>(UndoRedo-wrapped)
+    Editor-->>Server: ok
+    Server->>CLI: re-run tests.run_gameplay
+    CLI-->>Server: TestReport (passed=1, failed=0)
+    Server-->>Agent: { retries=1, status=ok }
+```
+
+If the retry counter reaches the hard limit of three without a clean
+`TestReport`, the self-healing loop escalates to `manual_review`
+instead of looping forever — the `healing.suggest_action` property
+test exercises that upper bound directly.
 
 ## Module consolidation — why `forgekit_rpg` is one module
 

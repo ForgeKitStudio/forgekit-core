@@ -250,6 +250,44 @@ jobs:
           fi
 
   # -------------------------------------------------------------------------
+  # Coverage matrix idempotency check — regenerates `docs/coverage_matrix.md`
+  # from the spec and the test annotations, then fails when the generated
+  # file differs from the committed copy. Ensures the matrix never drifts
+  # from the source of truth.
+  # -------------------------------------------------------------------------
+  coverage-matrix:
+    name: coverage-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Regenerate coverage matrix and diff against the committed copy
+        shell: bash
+        env:
+          # Point the generator at the repo-vendored spec when present;
+          # the script falls back to `$HOME/dummy/.kiro/...` only in
+          # local development.
+          FORGEKIT_SPEC_DIR: ${{ github.workspace }}/.kiro/specs/action-rpg-starter-kit
+        run: |
+          set -euo pipefail
+          if [ ! -d "${FORGEKIT_SPEC_DIR}" ]; then
+            echo "coverage-matrix: spec directory not vendored in the repo — skipping"
+            exit 0
+          fi
+          node tools/generate-coverage-matrix.js
+          git diff --exit-code -- docs/coverage_matrix.md || {
+            echo "coverage-matrix: docs/coverage_matrix.md is stale." >&2
+            echo "Run 'node tools/generate-coverage-matrix.js' and commit the result." >&2
+            exit 1
+          }
+
+  # -------------------------------------------------------------------------
   # Pull request template completeness check. Only runs for pull requests;
   # fails with the `-32014 PR_TEMPLATE_INCOMPLETE` error code when any of
   # the four required sections is empty.

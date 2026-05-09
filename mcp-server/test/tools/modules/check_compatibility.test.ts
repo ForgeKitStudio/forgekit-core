@@ -204,3 +204,32 @@ describe('checkCompatibility — errors', () => {
     ).rejects.toThrow(ToolInputError);
   });
 });
+
+
+describe('checkCompatibility — required/installed aliases (phase 6.22.4)', () => {
+  it('returns compatible:false with required + installed when the installed Core is older than core_min_version', async () => {
+    await installManifest('forgekit_rpg', '0.9.0');
+    const result = await checkCompatibility({
+      projectRoot: workspace,
+      moduleId: 'forgekit_rpg',
+      coreVersion: '0.7.0',
+    });
+    expect(result.compatible).toBe(false);
+    expect(result.required).toBe('0.9.0');
+    expect(result.installed).toBe('0.7.0');
+    expect(result.core_min_version).toBe('0.9.0');
+    expect(result.core_version).toBe('0.7.0');
+  });
+
+  it('returns required + installed on compatible responses too', async () => {
+    await installManifest('forgekit_rpg', '0.5.0');
+    const result = await checkCompatibility({
+      projectRoot: workspace,
+      moduleId: 'forgekit_rpg',
+      coreVersion: '0.7.0',
+    });
+    expect(result.compatible).toBe(true);
+    expect(result.required).toBe('0.5.0');
+    expect(result.installed).toBe('0.7.0');
+  });
+});

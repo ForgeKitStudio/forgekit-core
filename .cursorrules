@@ -143,6 +143,33 @@ Phase 5 adds three subtrees alongside the existing `tools/` directory:
 `plugin_lifecycle.gd` wires these adapters through optional Callable
 factories so headless tests can inject fakes.
 
+Phase 6A adds twelve editor-channel categories as adapter files under
+`tools/`: `animation_tools.gd`, `tilemap_tools.gd`, `theme_ui_tools.gd`,
+`shader_tools.gd`, `physics_tools.gd`, `scene3d_tools.gd`,
+`particle_tools.gd`, `navigation_tools.gd`, `audio_tools.gd`,
+`animation_tree_tools.gd`, `state_machine_tools.gd`,
+`blend_tree_tools.gd`. Mutating tools route through
+`McpUndoRedoWrapper`. Tools that touch `project.godot`
+(`physics.set_gravity`, `physics.configure_layer`,
+`navigation.configure_layers`) go through
+`McpProjectSettingsAtomicWriter`.
+
+Phase 6B extends `McpJsonRpcDispatcher` with two observability hooks:
+`get_last_trace_context()` returns the `{trace_id, span_id}` pair
+attached to the most recent dispatch (read from a `_forgekit_trace`
+envelope on the incoming request or minted fresh when absent), and
+`set_metrics_sink(Callable)` registers a sink that receives
+`mcp.requests.total` and `mcp.requests.errors` increments per
+dispatch.
+
+Phase 6B also adds `McpUpdateChecker` at
+`addons/forgekit_core/mcp/editor_plugin/update_checker.gd`. The
+checker polls the GitHub releases endpoint at most once per hour
+(rate-limit cache at `user://mcp_update_check.json`) and formats an
+`UPDATE_AVAILABLE:` line for `editor.get_output_log` when a newer
+Core version is detected. The HTTP client is injected so the
+checker runs headlessly under tests.
+
 ## MCP runtime bridge
 
 Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
@@ -150,6 +177,20 @@ Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
 registered in `project.godot` and exposes the runtime surface to the MCP
 server over a local transport. Like the editor plugin, this tree is
 read-only for agents and expands in later phases.
+
+Phase 6A adds four runtime-channel adapter files under
+`runtime_bridge/tools/`: `physics_runtime_tools.gd` (raycast, shape_cast,
+query_point), `navigation_runtime_tools.gd` (find_path, debug_draw),
+`audio_runtime_tools.gd` (play_stream, stop_stream), and
+`state_machine_runtime_tools.gd` (travel, get_current). These tools
+require the game to be launched with `--mcp-bridge`.
+
+Phase 6B extends `McpBridge` with trace propagation. The UDP server
+calls `McpBridge.observe_packet(request)` once per accepted packet;
+when the parsed envelope carries a `trace` field with
+`{trace_id, span_id}`, the bridge echoes the pair through
+`get_last_trace_context()`. Missing envelopes are replaced with a
+freshly minted pair so every packet stays correlatable.
 
 ## MCP licensing
 
@@ -169,7 +210,7 @@ hook accepts the commit. Per-tool documentation and transport details live
 in `docs/mcp_api.md`.
 
 As of the `Unreleased` block in `CHANGELOG.md`, the `core`-scoped surface
-includes three new editor-channel categories added by Phase 5:
+includes three editor-channel categories added by Phase 5:
 
 - **Visualizer** — `visualizer.start`, `visualizer.stop`,
   `visualizer.render_scene_tree`, `visualizer.render_module_graph`,
@@ -182,6 +223,18 @@ includes three new editor-channel categories added by Phase 5:
   `healing.apply_and_retest`. Shares the `ALLOWED_SUGGESTED_ACTIONS`
   set (`inspect_tres`, `validate_gdscript`, `rerun_test`,
   `manual_review`) with `mcp-server/src/healing/suggest_action.ts`.
+
+Phase 6A adds two CLI-channel categories under `mcp-server/src/tools/`:
+
+- **Export** — `export.list_presets`, `export.run_preset`,
+  `export.validate_preset`. Spawns `godot --headless --export-*` via
+  the shared `SpawnGodot` helper.
+- **Android Deploy** — `android.list_devices`, `android.install_apk`,
+  `android.run_logcat`. Wraps `adb` via `src/tools/android/spawn_adb.ts`.
+
+Phase 6A also adds twelve editor-channel and four runtime-channel Godot
+tool categories (see the **MCP editor plugin** and **MCP runtime bridge**
+sections above).
 
 The `ToolModule` union in `mcp-server/src/profiles.ts` enumerates every
 module id recognized by the profile filter. As of v0.7.0 it covers
@@ -201,6 +254,54 @@ the compiled hook scripts. Changing the tsconfig `rootDir` or moving the CLI
 entry file requires updating the `..` count and the regression test in
 `test/cli_install_hooks.test.ts` (the test runs the compiled binary against
 a tmp git repo and asserts the shim points at an existing module).
+
+**Release-pipeline helper port**: `mcp-server/src/verify_manifest_tag.ts`
+mirrors the pure helpers from `forgekit-rpg/tools/verify-manifest-tag.js`
+so the Core property test `test/property_tag_compatibility.test.ts` can
+exercise `isValidCoreMinVersion` and `buildTagRefUrl` without a
+cross-repository import. Keep both copies byte-for-byte aligned.
+
+## Observability
+
+Phase 6B adds three observability primitives on the server side.
+
+- **JSON Lines log stream.** `mcp-server/src/observability/jsonl_logger.ts`
+  (class `JsonlLogger`) writes one line per event under
+  `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`. Shared line shape with
+  the Godot side:
+  `{ts, level, component, trace_id?, span_id?, method?, duration_ms?, data?}`.
+  The `--mcp-log-level` CLI flag controls the threshold; lines below
+  it are dropped. Files rotate by UTC date.
+- **Trace ids.** `mcp-server/src/observability/trace.ts` exports
+  `generateTraceId()` (8-char hex), `generateSpanId()` (4-char hex),
+  and `newTraceContext()`. The dispatcher reads `_forgekit_trace`
+  from WebSocket requests; the UDP bridge reads the `trace` field.
+  Missing contexts are minted so every request is correlatable.
+- **Metrics registry.** `mcp-server/src/observability/metrics.ts`
+  (class `MetricsRegistry`) offers an idempotent named registry of
+  `Counter` and `Histogram` instances. Canonical names:
+  `mcp.requests.total`, `mcp.requests.errors`,
+  `mcp.requests.duration_ms`, `mcp.heartbeat.drops`,
+  `mcp.reconnect.attempts`, `mcp.reconnect.backoff_ms`,
+  `mcp.editor_plugin.undo_stack_size`,
+  `mcp.runtime_bridge.udp_packets.received`,
+  `mcp.runtime_bridge.udp_packets.rejected`,
+  `mcp.healing.retries`. Histograms keep 1000-sample rolling windows
+  and report nearest-rank p50 / p95 / p99 via `snapshot()`.
+  `registerCanonicalMetrics(registry)` installs the full set at once.
+  `mcp.editor_plugin.undo_stack_size` is declared but deferred from
+  automatic wiring — the wrapper has no stack-size signal to
+  subscribe to.
+- **Health endpoint.** `mcp-server/src/health_endpoint.ts` (class
+  `HealthEndpoint`) binds the first free port in `6040-6049` on
+  `127.0.0.1` and merges the chosen port into
+  `mcp_active_port.json` under the `"health"` key. Routes:
+  `GET /health`, `GET /metrics` (Prometheus text), `GET /version`,
+  `GET /trace/:trace_id` (up to 100 entries, last 7 days of logs).
+- **Update channel.** `mcp-server/src/tools/runtime_bridge/handshake.ts`
+  exposes `readLatestVersionFromCache(path)` to source the
+  `server.latest_version` field of `runtime.handshake` from the
+  editor-plugin's update-check cache. See `README.md#updating`.
 
 ## Git hooks
 

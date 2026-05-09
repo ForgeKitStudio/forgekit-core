@@ -493,3 +493,125 @@ func test_register_handler_overwrites_previous_handler_for_same_method() -> void
 	assert_eq(old_sink.call_count, 0, "Overwritten handler must not be invoked")
 	assert_eq(new_sink.call_count, 1, "Replacement handler must be invoked exactly once")
 	assert_eq(response.get("result", null), {"version": "new"}, "Result envelope must carry the replacement handler's return value")
+
+
+
+# ---------------------------------------------------------------------------
+# 21) Trace propagation: when the incoming request carries a
+#     `_forgekit_trace` envelope with `{trace_id, span_id}`, the dispatcher
+#     surfaces the same pair through `get_last_trace_context()` so callers
+#     (transports, loggers) can correlate log lines across processes.
+# ---------------------------------------------------------------------------
+
+func test_dispatch_propagates_trace_id_when_present() -> void:
+	var dispatcher: Object = _new_dispatcher()
+	var sink: HandlerSink = _new_sink({"ok": true})
+	dispatcher.register_handler("ping", Callable(sink, "handle"))
+
+	var _response: Dictionary = dispatcher.dispatch({
+		"jsonrpc": "2.0",
+		"method": "ping",
+		"params": {},
+		"id": 1,
+		"_forgekit_trace": {"trace_id": "abcd1234", "span_id": "0001"},
+	})
+
+	var ctx: Dictionary = dispatcher.get_last_trace_context()
+	assert_eq(String(ctx.get("trace_id", "")), "abcd1234", "trace_id must be echoed from the _forgekit_trace envelope")
+	assert_eq(String(ctx.get("span_id", "")), "0001", "span_id must be echoed from the _forgekit_trace envelope")
+
+
+# ---------------------------------------------------------------------------
+# 22) Absent trace context: the dispatcher generates a fresh 8-char hex
+#     trace_id and 4-char hex span_id so every request is correlatable
+#     even when the transport did not inject a context.
+# ---------------------------------------------------------------------------
+
+func test_dispatch_generates_trace_id_when_absent() -> void:
+	var dispatcher: Object = _new_dispatcher()
+	var sink: HandlerSink = _new_sink({"ok": true})
+	dispatcher.register_handler("ping", Callable(sink, "handle"))
+
+	var _response: Dictionary = dispatcher.dispatch({
+		"jsonrpc": "2.0",
+		"method": "ping",
+		"params": {},
+		"id": 2,
+	})
+
+	var ctx: Dictionary = dispatcher.get_last_trace_context()
+	var trace_id: String = String(ctx.get("trace_id", ""))
+	var span_id: String = String(ctx.get("span_id", ""))
+	var hex_re: RegEx = RegEx.new()
+	hex_re.compile("^[0-9a-f]{8}$")
+	var span_re: RegEx = RegEx.new()
+	span_re.compile("^[0-9a-f]{4}$")
+	assert_not_null(hex_re.search(trace_id), "trace_id must be 8-char lowercase hex when generated; got '%s'" % trace_id)
+	assert_not_null(span_re.search(span_id), "span_id must be 4-char lowercase hex when generated; got '%s'" % span_id)
+
+
+
+# ---------------------------------------------------------------------------
+# 23) Metrics sink: when a sink is registered through
+#     `set_metrics_sink(callable)`, it fires once per dispatch with the
+#     canonical metric name `mcp.requests.total`, and once again with
+#     `mcp.requests.errors` when the response is an error envelope.
+# ---------------------------------------------------------------------------
+
+class MetricsSinkCallRecorder:
+	extends RefCounted
+
+	var calls: Array = []
+
+	func record(name: String, delta: int) -> void:
+		calls.append({"name": name, "delta": delta})
+
+
+func test_dispatch_emits_requests_total_on_every_call() -> void:
+	var dispatcher: Object = _new_dispatcher()
+	var sink: HandlerSink = _new_sink({"ok": true})
+	dispatcher.register_handler("ping", Callable(sink, "handle"))
+	var recorder: MetricsSinkCallRecorder = MetricsSinkCallRecorder.new()
+	dispatcher.set_metrics_sink(Callable(recorder, "record"))
+
+	var _response: Dictionary = dispatcher.dispatch({
+		"jsonrpc": "2.0",
+		"method": "ping",
+		"params": {},
+		"id": 1,
+	})
+
+	var totals: int = 0
+	var errors: int = 0
+	for call in recorder.calls:
+		var c: Dictionary = call as Dictionary
+		if String(c.get("name", "")) == "mcp.requests.total":
+			totals += int(c.get("delta", 0))
+		elif String(c.get("name", "")) == "mcp.requests.errors":
+			errors += int(c.get("delta", 0))
+	assert_eq(totals, 1, "Expected exactly one mcp.requests.total increment on a successful call")
+	assert_eq(errors, 0, "mcp.requests.errors must not fire on a successful call")
+
+
+func test_dispatch_emits_requests_errors_on_failed_call() -> void:
+	var dispatcher: Object = _new_dispatcher()
+	var recorder: MetricsSinkCallRecorder = MetricsSinkCallRecorder.new()
+	dispatcher.set_metrics_sink(Callable(recorder, "record"))
+
+	# Unknown method — dispatcher returns a -32601 error envelope.
+	var _response: Dictionary = dispatcher.dispatch({
+		"jsonrpc": "2.0",
+		"method": "does.not.exist",
+		"id": 1,
+	})
+
+	var totals: int = 0
+	var errors: int = 0
+	for call in recorder.calls:
+		var c: Dictionary = call as Dictionary
+		if String(c.get("name", "")) == "mcp.requests.total":
+			totals += int(c.get("delta", 0))
+		elif String(c.get("name", "")) == "mcp.requests.errors":
+			errors += int(c.get("delta", 0))
+	assert_eq(totals, 1, "Every dispatch increments mcp.requests.total, including errors")
+	assert_eq(errors, 1, "Error responses must also increment mcp.requests.errors")

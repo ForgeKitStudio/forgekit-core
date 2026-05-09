@@ -185,6 +185,7 @@ const FIXTURE_PATH_ALLOWLIST = new Set([
     'mcp-server/test/validate_language_policy.test.ts',
     'tools/validate-language-policy.js',
     'language-policy-violations.json',
+    'docs/coverage_matrix.md',
 ]);
 
 /**

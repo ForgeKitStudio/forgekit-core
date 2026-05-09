@@ -12,6 +12,188 @@ every published tag has a matching entry.
 
 ### Added
 
+- **Phase 6B — SKILLS pack completion + observability foundation:**
+  - **SKILLS pack (Phase 6.15).** Populated the three remaining
+    scenario files (`authoring_items.md`,
+    `debugging_failing_tests.md`, `self_healing_tres.md`) to the
+    same quality as `module_licensing.md`. Every skill now carries
+    `api_version: 0.7.0`, a scenario description, an ordered MCP
+    tool call sequence, error-handling guidance, and an example
+    user query.
+  - **Structured logs (Phase 6.16).** New `JsonlLogger` on both
+    sides:
+    - Godot: `addons/forgekit_core/mcp/observability/jsonl_logger.gd`
+      (`class_name McpJsonlLogger`) writing to
+      `user://mcp_logs/<component>/<YYYY-MM-DD>.jsonl`. Configurable
+      via the `FORGEKIT_MCP_LOG_LEVEL` env var.
+    - Server: `mcp-server/src/observability/jsonl_logger.ts`
+      writing to `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`.
+      Configurable via the `--mcp-log-level` CLI flag already
+      parsed by `parseCliArgs`.
+    - Shared line shape:
+      `{ts, level, component, trace_id?, span_id?, method?, duration_ms?, data?}`
+      so a single trace id can be grep'd across streams.
+    - Files rotate by UTC date; each line is appended atomically
+      with no cross-line buffering.
+  - **Trace id + span id (Phase 6.17).**
+    - `mcp-server/src/observability/trace.ts` exports
+      `generateTraceId()` (8-char lowercase hex),
+      `generateSpanId()` (4-char lowercase hex), and
+      `newTraceContext()` returning `{trace_id, span_id}`.
+    - `McpJsonRpcDispatcher` (editor channel) reads
+      `_forgekit_trace` from incoming requests, mints a fresh pair
+      when absent, and surfaces the pair through
+      `get_last_trace_context()`.
+    - `McpBridge` (runtime channel) exposes
+      `observe_packet(request)` / `get_last_trace_context()`; the
+      UDP server calls the former per accepted packet, reading the
+      top-level `trace` field.
+  - **Metrics registry (Phase 6.18).**
+    - `mcp-server/src/observability/metrics.ts` adds `Counter`,
+      `Histogram` (rolling window of 1000 observations with
+      nearest-rank `p50/p95/p99`), and a `MetricsRegistry` with
+      idempotent `registerCounter(name)` /
+      `registerHistogram(name)`.
+    - Canonical metric names declared as exported constants:
+      `mcp.requests.total`, `mcp.requests.errors`,
+      `mcp.requests.duration_ms`, `mcp.heartbeat.drops`,
+      `mcp.reconnect.attempts`, `mcp.reconnect.backoff_ms`,
+      `mcp.editor_plugin.undo_stack_size`,
+      `mcp.runtime_bridge.udp_packets.received`,
+      `mcp.runtime_bridge.udp_packets.rejected`,
+      `mcp.healing.retries`.
+    - `registerCanonicalMetrics(registry)` installs the full set.
+    - Dispatcher integration: `McpJsonRpcDispatcher.set_metrics_sink(Callable)`
+      surfaces `mcp.requests.total` on every dispatch and
+      `mcp.requests.errors` on JSON-RPC error responses. Sinks may
+      translate these calls into any downstream metric registry.
+  - **Deferred:** `mcp.editor_plugin.undo_stack_size` is declared
+    but not automatically emitted — the editor `UndoRedoWrapper`
+    has no stack-size signal to subscribe to. Wiring will land in a
+    future pass when the wrapper exposes the needed observable.
+  - **Health endpoint HTTP server (Phase 6.19).**
+    `mcp-server/src/health_endpoint.ts` (class `HealthEndpoint`)
+    binds the first free port in `6040-6049` on `127.0.0.1` and
+    merges the chosen port into `mcp_active_port.json` under the
+    `"health"` key. Four read-only routes:
+    - `GET /health` — `{status, checks: {editor, runtime, cli}}`
+      with the `ok`/`degraded`/`down` roll-up.
+    - `GET /metrics` — Prometheus text format rendering the
+      canonical counter + histogram surface.
+    - `GET /version` — `{server, core_detected, api_version}`; the
+      `core_detected` field resolves from
+      `git describe --tags --abbrev=0` and falls back to `"unknown"`.
+    - `GET /trace/:trace_id` — the last 100 JSONL entries (across
+      the last 7 UTC days) matching the supplied `trace_id`, sorted
+      by `ts` ascending.
+  - **Update channels (Phase 6.22).**
+    - `addons/forgekit_core/mcp/editor_plugin/update_checker.gd`
+      (`class_name McpUpdateChecker`) polls the GitHub releases
+      endpoint for `ForgeKitStudio/forgekit-core` at most once per
+      hour and appends a single
+      `UPDATE_AVAILABLE: ForgeKit Core v<new> available (running
+      v<current>). Run 'npx -y @forgekit/core-mcp@latest' to
+      upgrade.` line to `editor.get_output_log` when a newer Core
+      version is detected. The HTTP client is injected so the
+      checker runs headlessly under tests and silently no-ops on
+      network failure. Rate-limit cache lives at
+      `user://mcp_update_check.json`.
+    - `mcp-server/src/tools/runtime_bridge/handshake.ts` exposes
+      `readLatestVersionFromCache(path)` so the runtime bridge can
+      populate the `server.latest_version` field of the
+      `runtime.handshake` response from the same cache. Returns
+      `null` when no newer version is known.
+    - `modules.check_compatibility` result shape extended with
+      `required` and `installed` aliases for `core_min_version` /
+      `core_version` so callers following the requirements-document
+      language (`{compatible: false, required, installed}`) can
+      read the same fact without reshaping the result client-side.
+      Existing `core_min_version` / `core_version` fields are
+      preserved.
+    - `README.md` now carries an **Updating** section documenting
+      `npx -y @forgekit/core-mcp@latest`, the `UPDATE_AVAILABLE`
+      signal, and `modules.check_compatibility` as the
+      authoritative tool for module / Core compatibility checks.
+
+### Added (Phase 6A — previous sub-delivery)
+
+- **Phase 6A — 67 new MCP tools across 14 categories filling the v1.0
+  Full parity gap with competing Godot MCP servers:**
+  - **Animation** (6 editor-channel tools): `animation.list`, `animation.play`,
+    `animation.stop`, `animation.add_track`, `animation.insert_keyframe`,
+    `animation.remove_track`. Three mutating tools UndoRedo-wrapped.
+  - **TileMap** (6 editor-channel tools): `tilemap.set_cell`,
+    `tilemap.get_cell`, `tilemap.fill_rect`, `tilemap.clear_layer`,
+    `tilemap.import_from_json`, `tilemap.export_to_json`. Five mutating
+    tools UndoRedo-wrapped.
+  - **Theme / UI** (6 editor-channel tools): `theme.create`,
+    `theme.set_default_font`, `theme.set_color`, `theme.set_stylebox`,
+    `ui.build_control_tree`, `ui.apply_layout_preset`. All UndoRedo-wrapped.
+  - **Shader** (6 editor-channel tools): `shader.create`, `shader.validate`,
+    `shader.save_with_validation`, `shader.set_uniform`,
+    `shader.list_uniforms`, `shader.convert_visual_to_text`. Four mutating
+    tools UndoRedo-wrapped.
+  - **Physics** (6 tools, 3 editor + 3 runtime): editor-channel
+    `physics.set_gravity`, `physics.get_collision_layer_names`,
+    `physics.configure_layer` (atomic `project.godot` writes via
+    `McpProjectSettingsAtomicWriter`); runtime-channel `physics.raycast`,
+    `physics.shape_cast`, `physics.query_point`.
+  - **3D Scene** (6 editor-channel tools): `scene3d.add_mesh_instance`,
+    `scene3d.add_light`, `scene3d.add_camera`, `scene3d.set_environment`,
+    `scene3d.bake_lightmap`, `scene3d.import_gltf`. Five mutating tools
+    UndoRedo-wrapped.
+  - **Particle** (5 editor-channel tools): `particle.create_gpu`,
+    `particle.create_cpu`, `particle.set_emission_shape`,
+    `particle.preview_in_editor`, `particle.convert_cpu_to_gpu`. Four
+    mutating tools UndoRedo-wrapped.
+  - **Navigation** (6 tools, 4 editor + 2 runtime): editor-channel
+    `navigation.bake_mesh`, `navigation.add_agent`, `navigation.set_avoidance`,
+    `navigation.configure_layers`; runtime-channel `navigation.find_path`,
+    `navigation.debug_draw`.
+  - **Audio** (6 tools, 4 editor + 2 runtime): editor-channel
+    `audio.list_buses`, `audio.set_bus_volume_db`, `audio.add_bus_effect`,
+    `audio.import_sound`; runtime-channel `audio.play_stream`,
+    `audio.stop_stream`.
+  - **AnimationTree** (4 editor-channel tools): `animation_tree.create`,
+    `animation_tree.set_parameter`, `animation_tree.get_parameters`,
+    `animation_tree.set_active`. Three mutating tools UndoRedo-wrapped.
+  - **State Machine** (3 tools, 1 editor + 2 runtime): editor-channel
+    `state_machine.list_states`; runtime-channel `state_machine.travel`,
+    `state_machine.get_current`.
+  - **Blend Tree** (1 editor-channel tool): `blend_tree.configure_node`.
+    UndoRedo-wrapped.
+  - **Export** (3 CLI-channel tools): `export.list_presets`,
+    `export.run_preset`, `export.validate_preset`. The run tool spawns
+    `godot --headless --export-release` (or `--export-debug`) through
+    the shared `SpawnGodot` helper.
+  - **Android Deploy** (3 CLI-channel tools): `android.list_devices`,
+    `android.install_apk`, `android.run_logcat`. Wraps the `adb` binary
+    resolved from `ADB_BIN` at call time.
+- **67 new entries** in `mcp-server/profiles.json` covering the 14
+  categories above (all `scope: core`, `module: core`; channel mix:
+  48 editor, 10 runtime, 9 cli).
+- **Adapter files** under
+  `addons/forgekit_core/mcp/editor_plugin/tools/`:
+  `animation_tools.gd`, `tilemap_tools.gd`, `theme_ui_tools.gd`,
+  `shader_tools.gd`, `physics_tools.gd`, `scene3d_tools.gd`,
+  `particle_tools.gd`, `navigation_tools.gd`, `audio_tools.gd`,
+  `animation_tree_tools.gd`, `state_machine_tools.gd`,
+  `blend_tree_tools.gd`.
+- **Runtime adapter files** under
+  `addons/forgekit_core/mcp/runtime_bridge/tools/`:
+  `physics_runtime_tools.gd`, `navigation_runtime_tools.gd`,
+  `audio_runtime_tools.gd`, `state_machine_runtime_tools.gd`.
+- **CLI-channel TypeScript modules** under `mcp-server/src/tools/`:
+  `export/list_presets.ts`, `export/run_preset.ts`,
+  `export/validate_preset.ts`, `export/presets_parser.ts`,
+  `export/errors.ts`, `android/list_devices.ts`, `android/install_apk.ts`,
+  `android/run_logcat.ts`, `android/spawn_adb.ts`.
+- **`plugin_lifecycle.gd`** extended with twelve new factory Callables
+  (one per editor-channel Phase 6A category) wired through a shared
+  registration loop. Backwards-compatible: lifecycles pre-dating
+  Phase 6A continue to work without the new factories.
+- **`docs/mcp_api.md`** — 14 new sections covering the Phase 6A tool
+  surface with params, results, and channel routing notes.
 - **Visualizer category (5 new MCP tools)**: `visualizer.start`,
   `visualizer.stop`, `visualizer.render_scene_tree`,
   `visualizer.render_module_graph`, `visualizer.render_event_bus`. The

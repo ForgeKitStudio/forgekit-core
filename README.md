@@ -18,6 +18,30 @@ running game through a stable tool surface.
   `@forgekit/core-mcp` package).
 - `npm` 10 or newer (ships with Node.js 20).
 
+## Compared to
+
+ForgeKit Core is one of several MCP servers targeting the Godot
+editor. The table below lists factual differences against the
+communities' most active alternatives at the time of writing. Rows
+mark "no" when the upstream project does not advertise the capability
+in its README; see each project's documentation for the latest state.
+
+| Capability              | ForgeKit Core             | [godot-mcp-pro](https://github.com/sparklecom/godot-mcp-pro) | [tomyud1/godot-mcp](https://github.com/tomyud1/godot-mcp) | [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp) |
+| ----------------------- | ------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
+| Tool count              | ~215 (Full profile)       | ~150                                                       | ~120                                                      | ~90                                                               |
+| Editor channel          | yes (WebSocket, 6010-6019) | yes                                                        | yes                                                       | no                                                                |
+| Runtime channel         | yes (UDP, 6020-6029)      | no                                                         | no                                                        | no                                                                |
+| CLI channel             | yes (spawn `godot --headless`) | yes                                                    | yes                                                       | yes                                                               |
+| UndoRedo integration    | yes (every editor mutation) | partial                                                  | no                                                        | no                                                                |
+| Self-healing loop       | yes (`.tres` inspect + suggest + bounded retry) | no                                         | no                                                        | no                                                                |
+| Modules / licensing     | yes (paid `forgekit_rpg` + HMAC license store) | no                                          | no                                                        | no                                                                |
+| Observability           | structured JSONL logs + trace/span ids + Prometheus metrics + health endpoint | no | no                                                        | no                                                                |
+
+The comparison is about architectural scope only — every project
+listed above ships the fundamentals agents need for editor automation
+and is worth evaluating alongside ForgeKit Core based on the team's
+day-to-day workflow.
+
 ## Quickstart
 
 This quickstart takes you from zero to the first `crafting.execute` call in
@@ -64,6 +88,44 @@ paid **ForgeKit RPG Module**.
    ```
 10. Call `crafting.execute("iron_ingot")` from the same MCP client and watch
     the item appear in the inventory.
+
+## Updating
+
+ForgeKit ships three independent update channels, one per product.
+
+- **MCP Server (`@forgekit/core-mcp`).** Run
+  `npx -y @forgekit/core-mcp@latest` to pull the newest version from
+  npm. The editor plugin polls the GitHub releases endpoint once per
+  hour; when a newer ForgeKit Core version is detected it appends a
+  single line to `editor.get_output_log`:
+  ```
+  UPDATE_AVAILABLE: ForgeKit Core v<new> available (running v<current>).
+  Run 'npx -y @forgekit/core-mcp@latest' to upgrade.
+  ```
+  Clients that scrape the editor log stream (Kiro, Claude Code,
+  Cursor, ...) surface the notice without any extra wiring. The
+  one-hour rate limit is enforced through a small cache at
+  `user://mcp_update_check.json`; delete that file if you want to
+  force an immediate re-check. Network failures (offline, DNS error,
+  non-200 response) are silent: the checker reports no update rather
+  than surfacing a false positive, and the cache is only written on a
+  successful fetch so the next call retries.
+- **ForgeKit Core addon (`addons/forgekit_core/`).** Replace the
+  directory with the newest release tarball, or pull the update
+  through Godot's AssetLib "Update" action. The addon never rewrites
+  itself in place.
+- **ForgeKit RPG Module (`addons/forgekit_rpg/`).** Replace the
+  module directory with the newest ZIP from
+  [itch.io](https://forgekitstudio.itch.io/forgekit-rpg) or
+  [Gumroad](https://forgekitstudio.gumroad.com/l/forgekit-rpg). After
+  extracting, call `modules.check_compatibility(module_id=
+  "forgekit_rpg")` — the tool compares the module's
+  `core_min_version` against the installed Core version and returns
+  `{compatible: false, required, installed}` when the module needs a
+  newer Core than you have. `modules.check_compatibility` is the
+  authoritative source of truth for module / Core version
+  compatibility; agents MUST consult it before activating a module
+  and SHOULD consult it after every update.
 
 ## Required git hooks
 

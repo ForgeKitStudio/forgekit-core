@@ -173,3 +173,54 @@ func test_activate_is_idempotent_when_called_twice() -> void:
 
 	assert_same(first_server, second_server, "Second activate() must not replace the live server instance")
 	assert_eq((first_server as FakeUdpServer).start_calls.size(), 1, "start() must not be called twice on the same server")
+
+
+
+# ---------------------------------------------------------------------------
+# 6) Trace propagation: when an incoming UDP packet carries a `trace` field
+#    with `{trace_id, span_id}`, `observe_packet(request)` stores the same
+#    pair on the bridge so downstream loggers can correlate log lines
+#    across processes.
+# ---------------------------------------------------------------------------
+
+func test_observe_packet_propagates_trace_id_when_present() -> void:
+	var bridge: Node = _new_bridge()
+	add_child_autofree(bridge)
+
+	bridge.observe_packet({
+		"jsonrpc": "2.0",
+		"method": "runtime.heartbeat",
+		"id": 1,
+		"trace": {"trace_id": "aabbccdd", "span_id": "ffee"},
+	})
+
+	var ctx: Dictionary = bridge.get_last_trace_context()
+	assert_eq(String(ctx.get("trace_id", "")), "aabbccdd", "trace_id must be echoed from the packet trace field")
+	assert_eq(String(ctx.get("span_id", "")), "ffee", "span_id must be echoed from the packet trace field")
+
+
+# ---------------------------------------------------------------------------
+# 7) Absent trace context: observe_packet() mints a fresh 8-char hex
+#    trace_id and 4-char hex span_id so every packet is correlatable even
+#    when the sender did not inject a trace envelope.
+# ---------------------------------------------------------------------------
+
+func test_observe_packet_generates_trace_id_when_absent() -> void:
+	var bridge: Node = _new_bridge()
+	add_child_autofree(bridge)
+
+	bridge.observe_packet({
+		"jsonrpc": "2.0",
+		"method": "runtime.heartbeat",
+		"id": 2,
+	})
+
+	var ctx: Dictionary = bridge.get_last_trace_context()
+	var trace_id: String = String(ctx.get("trace_id", ""))
+	var span_id: String = String(ctx.get("span_id", ""))
+	var hex_re: RegEx = RegEx.new()
+	hex_re.compile("^[0-9a-f]{8}$")
+	var span_re: RegEx = RegEx.new()
+	span_re.compile("^[0-9a-f]{4}$")
+	assert_not_null(hex_re.search(trace_id), "trace_id must be 8-char lowercase hex when generated; got '%s'" % trace_id)
+	assert_not_null(span_re.search(span_id), "span_id must be 4-char lowercase hex when generated; got '%s'" % span_id)
