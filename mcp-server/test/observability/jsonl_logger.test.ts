@@ -99,6 +99,29 @@ describe('JsonlLogger — basic round-trip', () => {
     expect(line!.method).toBe('project.info');
     expect(line!.duration_ms).toBe(12);
   });
+
+  it('promotes workspace_id to the top level as a reserved field (Phase 7)', async () => {
+    const logger = new JsonlLogger({
+      baseDir: env.baseDir,
+      level: 'info',
+      clock: () => new Date('2026-05-16T18:12:33.540Z'),
+    });
+
+    logger.log('info', 'mcp_server', {
+      trace_id: 'abcd1234',
+      workspace_id: 'client-a',
+      payload_hint: 'goes to data',
+    });
+
+    const raw = await readFile(join(env.baseDir, '2026-05-16.jsonl'), 'utf8');
+    const [line] = readLines(raw);
+    expect(line!.workspace_id).toBe('client-a');
+    expect(line!.trace_id).toBe('abcd1234');
+    // Non-reserved keys stay nested under data.
+    const data = line!.data as Record<string, unknown>;
+    expect(data.payload_hint).toBe('goes to data');
+    expect(data.workspace_id).toBeUndefined();
+  });
 });
 
 describe('JsonlLogger — level filter', () => {

@@ -39,7 +39,11 @@ describe('projectReload — happy path', () => {
         setTimeout(() => resolve({ reloaded: true }), 20),
       );
     const result = await projectReload({}, { dispatch });
-    expect(result.duration_ms).toBeGreaterThanOrEqual(20);
+    // Allow a small jitter tolerance — CI runners occasionally resolve
+    // `setTimeout(..., 20)` at 19ms wall-clock due to 1ms timer
+    // resolution on some kernels. Anything within 2ms of the intended
+    // delay still proves the timer was honoured.
+    expect(result.duration_ms).toBeGreaterThanOrEqual(18);
   });
 });
 

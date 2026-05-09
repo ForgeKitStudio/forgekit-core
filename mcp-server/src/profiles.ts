@@ -1,5 +1,5 @@
 /**
- * Tool profile loader and selector for `@forgekit/core-mcp`.
+ * Tool profile loader and selector for `@forgekitstudio/core-mcp`.
  *
  * Four profiles control which tools the MCP server exposes:
  *   - Full     — every tool.

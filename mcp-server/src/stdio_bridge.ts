@@ -1,5 +1,5 @@
 /**
- * Stdio bridge for `@forgekit/core-mcp`.
+ * Stdio bridge for `@forgekitstudio/core-mcp`.
  *
  * Accepts JSON-RPC 2.0 requests on stdin using LSP-style `Content-Length`
  * framing, forwards each request to a pluggable `ChannelDispatcher`, and

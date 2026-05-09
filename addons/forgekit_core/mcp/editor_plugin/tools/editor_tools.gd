@@ -22,7 +22,7 @@ extends RefCounted
 ## UPDATE_AVAILABLE integration
 ##
 ## Requirement 38.1 / design §11.6 mandate that when the MCP Server detects a
-## newer ForgeKit_Core or `@forgekit/core-mcp` release, it publishes an
+## newer ForgeKit_Core or `@forgekitstudio/core-mcp` release, it publishes an
 ## `UPDATE_AVAILABLE` entry into the editor output log so `editor.get_output_log`
 ## surfaces it to the caller alongside normal log lines. The canonical entry
 ## shape is produced by `build_update_available_entry(component, current, latest)`

@@ -13,7 +13,7 @@ A clear and concise description of the problem.
 ## Affected Component
 
 - [ ] `addons/forgekit_core/` (Godot addon)
-- [ ] `mcp-server/` (`@forgekit/core-mcp` npm package)
+- [ ] `mcp-server/` (`@forgekitstudio/core-mcp` npm package)
 - [ ] Git hooks (`commit-msg`, `pre-commit`)
 - [ ] CI workflows (`.github/workflows/`)
 - [ ] Documentation / SKILLS
@@ -21,7 +21,7 @@ A clear and concise description of the problem.
 ## Environment
 
 - ForgeKit Core version or commit SHA:
-- `@forgekit/core-mcp` version:
+- `@forgekitstudio/core-mcp` version:
 - Godot version:
 - Operating system and version:
 - MCP client (Claude Desktop, Cursor, Kiro, ...):

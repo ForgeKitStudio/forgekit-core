@@ -21,6 +21,11 @@ import {
 } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 
+import {
+  PortRangeExhaustedError,
+  type ChannelName,
+} from './projects/errors.js';
+
 /** A contiguous `[start, end]` port range. Both bounds are inclusive. */
 export interface PortRange {
   readonly start: number;
@@ -163,17 +168,52 @@ async function isUdpPortFree(port: number): Promise<boolean> {
 }
 
 /**
- * Returns the first free TCP port in `range`. Throws `RangeExhaustedError`
- * when every port is occupied.
+ * Options accepted by `scanFreePort`.
+ *
+ * `excluded` lets multi-workspace callers pre-filter ports already
+ * bound by sibling workspaces in the same process. `channel`, when
+ * supplied, switches the exhaustion error from the legacy
+ * `RangeExhaustedError` to the v0.9.0 `PortRangeExhaustedError` so
+ * the dispatcher can forward a well-formed JSON-RPC envelope.
  */
-export async function scanFreePort(range: PortRange): Promise<number> {
+export interface ScanFreePortOptions {
+  readonly excluded?: ReadonlyArray<number>;
+  readonly channel?: ChannelName;
+}
+
+/**
+ * Returns the first free TCP port in `range` that is not listed in
+ * `options.excluded`. Throws `RangeExhaustedError` (legacy) when no
+ * channel is supplied and every port is occupied; throws
+ * `PortRangeExhaustedError` (-32020) when `options.channel` is
+ * supplied and exhaustion is reached.
+ */
+export async function scanFreePort(
+  range: PortRange,
+  options?: ScanFreePortOptions,
+): Promise<number> {
   validateRange(range);
+  const excludedSet = new Set<number>(options?.excluded ?? []);
   const checked: number[] = [];
+  const inUse: number[] = [];
   for (let port = range.start; port <= range.end; port++) {
     checked.push(port);
+    if (excludedSet.has(port)) {
+      inUse.push(port);
+      continue;
+    }
     if (await isTcpPortFree(port)) {
       return port;
     }
+    inUse.push(port);
+  }
+  if (options?.channel !== undefined) {
+    throw new PortRangeExhaustedError({
+      channel: options.channel,
+      range_start: range.start,
+      range_end: range.end,
+      in_use: inUse,
+    });
   }
   throw new RangeExhaustedError(range, checked);
 }

@@ -59,6 +59,13 @@
       ]
     },
     {
+      "pattern": "mcp-server/src/projects/**/*.ts",
+      "anchors": [
+        "CLAUDE.md#workspaces",
+        ".cursorrules#workspaces"
+      ]
+    },
+    {
       "pattern": "mcp-server/scripts/git-hooks/**/*.ts",
       "anchors": [
         "CLAUDE.md#git-hooks",

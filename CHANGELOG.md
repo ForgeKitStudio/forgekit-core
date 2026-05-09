@@ -10,6 +10,132 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-09
+
+### Added
+
+- **Phase 7 — Multi-project support:**
+  - **ProjectRegistry.** New `mcp-server/src/projects/` subsystem owns
+    the server-process-wide registry of registered Godot projects.
+    `register` / `unregister` / `get` / `list` / `getActive` /
+    `setActive` / `size` / `serialize` expose the lifecycle; the
+    state is mirrored to `$HOME/.forgekit/workspaces.json` via an
+    atomic temp-file + rename (`FileSystemWorkspacesPersistence`),
+    and `ProjectRegistry.fromDisk()` rehydrates the registry on
+    startup.
+  - **Per-workspace channels.** `WorkspaceChannelsRegistry`
+    (`workspace_channels.ts`) holds the editor / runtime /
+    visualizer / health ports each workspace has allocated, plus
+    WebSocket and UDP connection placeholders. `allPortsInUse(channel)`
+    returns the union across all workspaces so the scanner can
+    exclude them in a single pass.
+  - **Workspace value type.** `Workspace` interface with immutable
+    `workspace_id`, `projectRoot`, `label?`, `registered_at` plus a
+    mutable `active` flag. Validation helpers
+    `validateWorkspaceId` / `validateLabel` enforce
+    `WORKSPACE_ID_REGEX = /^[a-z][a-z0-9_-]{0,63}$/`,
+    `MAX_WORKSPACES = 32`, and `MAX_LABEL_LENGTH = 120`.
+  - **Dispatcher middleware.** `resolveWorkspace(registry, params)`
+    (`projects/resolve_workspace.ts`) turns every incoming
+    `(workspace_id, projectRoot)` tuple into a concrete
+    `(Workspace, projectRoot)` pair. Four branches: explicit known
+    / explicit unknown / implicit active / empty registry. Explicit
+    `projectRoot` that diverges from the resolved workspace raises
+    `WORKSPACE_ROOT_MISMATCH`.
+  - **Auto-register default workspace.** On first startup, if the
+    registry is empty and `process.cwd()` contains `project.godot`,
+    the server registers a `default` workspace so pre-v0.9.0 clients
+    keep working without changes (`auto_register.ts`).
+  - **Five new MCP tools.** `project.list_workspaces`,
+    `project.switch`, `project.add`, `project.remove`,
+    `project.get_active` under `mcp-server/src/tools/project/`. All
+    five are `scope: core, channel: editor, module: core-minimal` in
+    `profiles.json`, meaning they are always available regardless of
+    active profile (including `Minimal`).
+  - **Eight new error codes.** `-32015` `WORKSPACE_NOT_FOUND`,
+    `-32016` `WORKSPACE_ALREADY_REGISTERED`, `-32017`
+    `PROJECT_ROOT_ALREADY_REGISTERED`, `-32018` `INVALID_PROJECT_ROOT`,
+    `-32019` `WORKSPACE_LIMIT_EXCEEDED`, `-32020`
+    `PORT_RANGE_EXHAUSTED`, `-32021` `NO_ACTIVE_WORKSPACE`,
+    `-32022` `WORKSPACE_ROOT_MISMATCH`. Every class carries the
+    `data.*` payload documented in `docs/mcp_api.md` Known error
+    codes table.
+  - **Property tests 49–51.**
+    - **Property 49** (`property_registry_determinism.test.ts`,
+      `numRuns: 100`, N ∈ [1..50]) — random operation sequences on
+      the registry produce identical final state + observations when
+      replayed on a fresh registry.
+    - **Property 50** (`property_port_isolation.test.ts`,
+      `numRuns: 100`) — K ∈ [1..8] sequential
+      `scanFreePort(range, {excluded, channel})` calls each seeing
+      all previous returns in `excluded` produce K pair-wise distinct
+      ports; exhaustion raises `PortRangeExhaustedError` carrying the
+      full in-use set.
+    - **Property 51** (`property_registry_errors.test.ts`,
+      `numRuns: 100` per error class) — every registry error class
+      has `code ∈ [-32022, -32015]` and a `data` record matching the
+      shape documented in Requirement 74.3; payload round-trips
+      through `JSON.stringify` unchanged.
+  - **SKILLS.** New `docs/SKILLS/managing_workspaces.md` covering
+    the add / switch / remove / get_active flow, error handling,
+    and an example agent response for the multi-project scenario.
+  - **AI context files.** `CLAUDE.md` + `.cursorrules` gain a
+    `## Workspaces` section anchored under the MCP server block.
+    `.forgekit/context-map.json` maps
+    `mcp-server/src/projects/**/*.ts` to that anchor so the
+    Context Commits hook enforces updates.
+
+### Changed
+
+- **`scanFreePort(range, options?)`.** The `scanFreePort` helper in
+  `mcp-server/src/port_scanner.ts` accepts an optional second argument
+  `{excluded?: ReadonlyArray<number>, channel?: ChannelName}`.
+  `excluded` lets multi-workspace callers pre-filter ports already
+  taken by sibling workspaces. `channel`, when supplied, switches the
+  exhaustion failure from the legacy `RangeExhaustedError` to the
+  v0.9.0 `PortRangeExhaustedError` (`-32020`). Backwards-compatible:
+  pre-v0.9.0 `scanFreePort(range)` callers still receive the legacy
+  error when every port is kernel-occupied.
+- **Health endpoint.** `HealthEndpointOptions` gains an optional
+  `registry: ProjectRegistry` dependency. When supplied, `/health`
+  responses include `workspaces: {count: number, active: string | null}`.
+  When omitted, the field is absent so callers predating Phase 7
+  continue to see the two-field shape.
+- **JSONL logger.** `workspace_id` is added to `RESERVED_FIELDS` in
+  both `mcp-server/src/observability/jsonl_logger.ts` and
+  `addons/forgekit_core/mcp/observability/jsonl_logger.gd`. The
+  dispatcher middleware sets `workspace_id` in log context for every
+  request so editor / runtime / CLI logs can be correlated by
+  workspace.
+- **`docs/mcp_api.md`.** New `Project management (multi-project)`
+  section documents the five `project.*` tools. The Known error codes
+  table is extended with entries `-32015` through `-32022`. A new
+  `Workspace routing (multi-project)` subsection under
+  `Observability` documents the per-workspace log correlation and the
+  `workspaces` field on `/health`.
+
+### Notes
+
+- Additive MINOR bump — full backwards compatibility with v0.8.x.
+  Every existing tool signature continues to accept `projectRoot`,
+  and the dispatcher auto-register falls back to the pre-v0.9.0
+  single-project behaviour when the server is started inside a
+  Godot project directory.
+- No error code in the `-32004`..`-32014` range changes semantics.
+
+### Changed
+
+- **npm package renamed from `@forgekit/core-mcp` to
+  `@forgekitstudio/core-mcp`** to align with the `ForgeKitStudio`
+  GitHub organization and publisher account. Install and update
+  commands become `npx -y @forgekitstudio/core-mcp` and
+  `npx -y @forgekitstudio/core-mcp@latest`. The global binary name
+  (`forgekit-mcp`) and every CLI flag are unchanged. The
+  `UPDATE_AVAILABLE` line written to `editor.get_output_log` now
+  advertises the new install command. Downstream users must reinstall
+  the package under the new scope once it is published; the old
+  `@forgekit/core-mcp` name will not receive further releases.
+
 ## [0.8.1] - 2026-05-09
 
 ### Fixed
@@ -21,7 +147,7 @@ every published tag has a matching entry.
   gate failed with `spawn godot ENOENT` on every prior tag push
   (v0.6.0, v0.7.0, v0.8.0), blocking the npm publish even though the
   GitHub Release itself landed successfully. First tag that actually
-  ships `@forgekit/core-mcp` to the npm registry.
+  ships `@forgekitstudio/core-mcp` to the npm registry.
 
 ### Notes
 
@@ -114,7 +240,7 @@ every published tag has a matching entry.
       endpoint for `ForgeKitStudio/forgekit-core` at most once per
       hour and appends a single
       `UPDATE_AVAILABLE: ForgeKit Core v<new> available (running
-      v<current>). Run 'npx -y @forgekit/core-mcp@latest' to
+      v<current>). Run 'npx -y @forgekitstudio/core-mcp@latest' to
       upgrade.` line to `editor.get_output_log` when a newer Core
       version is detected. The HTTP client is injected so the
       checker runs headlessly under tests and silently no-ops on
@@ -133,7 +259,7 @@ every published tag has a matching entry.
       Existing `core_min_version` / `core_version` fields are
       preserved.
     - `README.md` now carries an **Updating** section documenting
-      `npx -y @forgekit/core-mcp@latest`, the `UPDATE_AVAILABLE`
+      `npx -y @forgekitstudio/core-mcp@latest`, the `UPDATE_AVAILABLE`
       signal, and `modules.check_compatibility` as the
       authoritative tool for module / Core compatibility checks.
 
@@ -390,7 +516,7 @@ every published tag has a matching entry.
   `TresLoader`, `GameEvents` autoload with type-validated `emit_validated`,
   `Core_Boundary`, `ModuleManifest` + `ModuleLoader`,
   `GDScriptValidator`, `TestReport`.
-- MCP server skeleton (`@forgekit/core-mcp`) with port scanner,
+- MCP server skeleton (`@forgekitstudio/core-mcp`) with port scanner,
   profile registry (`Full`, `Lite`, `Minimal`, `RPG-only`),
   `stdio_bridge`, `type_parser`.
 - Core MCP tool surface: `project.*`, `tests.*`, `gdscript.validate`,
@@ -411,7 +537,8 @@ every published tag has a matching entry.
   workflows, git hook installer (`commit-msg`, `pre-commit`) covering
   Conventional Commits and Context Commits enforcement.
 
-[Unreleased]: https://github.com/ForgeKitStudio/forgekit-core/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/ForgeKitStudio/forgekit-core/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.9.0
 [0.8.1]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.8.1
 [0.8.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.7.0

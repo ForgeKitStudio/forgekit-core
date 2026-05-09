@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @forgekit/core-mcp — skeleton entrypoint.
+ * @forgekitstudio/core-mcp — skeleton entrypoint.
  *
  * This module exposes a pure CLI argument parser plus a thin `main()` driver.
  * It intentionally does NOT spin up the WebSocket client, UDP client or stdio
@@ -196,7 +196,7 @@ export async function main(
   );
 
   const message =
-    `[@forgekit/core-mcp] skeleton — ` +
+    `[@forgekitstudio/core-mcp] skeleton — ` +
     `stdio=${options.stdio}, profile=${options.profile}, logLevel=${options.logLevel}. ` +
     `Transport bridges are not wired up yet.`;
   process.stderr.write(`${message}\n`);
@@ -239,7 +239,7 @@ if (invokedDirectly) {
     })
     .catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[@forgekit/core-mcp] error: ${message}\n`);
+      process.stderr.write(`[@forgekitstudio/core-mcp] error: ${message}\n`);
       process.exit(1);
     });
 }

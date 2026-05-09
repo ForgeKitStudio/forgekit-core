@@ -1,5 +1,5 @@
 /**
- * TestReport types and (de)serializer for `@forgekit/core-mcp`.
+ * TestReport types and (de)serializer for `@forgekitstudio/core-mcp`.
  *
  * This module mirrors the JSON shape produced by
  * `addons/forgekit_core/testing/test_report.gd`:

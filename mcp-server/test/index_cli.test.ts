@@ -1,5 +1,5 @@
 /**
- * CLI argument parser tests for @forgekit/core-mcp.
+ * CLI argument parser tests for @forgekitstudio/core-mcp.
  *
  * These tests lock down the current flag surface:
  *   --stdio               boolean, default false

@@ -151,7 +151,7 @@ async function installSingleHook(params: {
       await fs.rename(hookPath, backupPath);
       backedUp = backupPath;
       logger.warn(
-        `[@forgekit/core-mcp] ${hookPath} already existed and was not authored by ForgeKit. Backed up to ${backupPath}.`,
+        `[@forgekitstudio/core-mcp] ${hookPath} already existed and was not authored by ForgeKit. Backed up to ${backupPath}.`,
       );
     }
   }

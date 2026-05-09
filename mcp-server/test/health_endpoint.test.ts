@@ -29,6 +29,9 @@ import {
   HealthEndpoint,
   type ChannelName,
 } from '../src/health_endpoint.js';
+import { ProjectRegistry } from '../src/projects/registry.js';
+import type { FileSystemAdapter } from '../src/projects/registry.js';
+import type { WorkspacesPersistence } from '../src/projects/persistence.js';
 
 interface TestEnv {
   tmpDir: string;
@@ -328,6 +331,98 @@ describe('HealthEndpoint — GET /trace/:trace_id', () => {
     );
     const arr = body as Array<Record<string, unknown>>;
     expect(arr.length).toBe(100);
+  });
+});
+
+describe('HealthEndpoint — GET /health with workspaces field (Phase 7)', () => {
+  function memoryPersistence(): WorkspacesPersistence {
+    let current = null;
+    return {
+      async read() {
+        return current;
+      },
+      async write() {
+        // ignore
+      },
+    };
+  }
+  function fakeFs(roots: ReadonlySet<string>): FileSystemAdapter {
+    return {
+      isAbsolute: (p) => p.startsWith('/'),
+      isDirectory: async (p) => roots.has(p),
+      hasProjectGodot: async (p) => roots.has(p),
+    };
+  }
+
+  it('returns workspaces: {count, active} summarising the ProjectRegistry', async () => {
+    const registry = new ProjectRegistry(
+      memoryPersistence(),
+      fakeFs(new Set(['/a', '/b'])),
+      () => '2026-05-09T19:30:00.000Z',
+    );
+    await registry.register({ workspace_id: 'a', projectRoot: '/a' });
+    await registry.register({ workspace_id: 'b', projectRoot: '/b' });
+    await registry.setActive('b');
+
+    env.server = new HealthEndpoint({
+      metrics: new MetricsRegistry(),
+      activePortFilePath: env.activePortFile,
+      logsDir: env.logsDir,
+      coreVersionResolver: async () => 'unknown',
+      serverVersion: '0.9.0',
+      channelStatusProvider: () => ({ editor: 'ok', runtime: 'ok', cli: 'ok' }),
+      registry,
+    });
+    await env.server.start();
+
+    const { status, body } = await fetchJson(
+      `http://127.0.0.1:${env.server.getPort()}/health`,
+    );
+    expect(status).toBe(200);
+    const b = body as Record<string, unknown>;
+    expect(b.workspaces).toEqual({ count: 2, active: 'b' });
+  });
+
+  it('returns workspaces: {count: 0, active: null} for an empty registry', async () => {
+    const registry = new ProjectRegistry(
+      memoryPersistence(),
+      fakeFs(new Set()),
+    );
+
+    env.server = new HealthEndpoint({
+      metrics: new MetricsRegistry(),
+      activePortFilePath: env.activePortFile,
+      logsDir: env.logsDir,
+      coreVersionResolver: async () => 'unknown',
+      serverVersion: '0.9.0',
+      channelStatusProvider: () => ({ editor: 'ok', runtime: 'ok', cli: 'ok' }),
+      registry,
+    });
+    await env.server.start();
+
+    const { body } = await fetchJson(
+      `http://127.0.0.1:${env.server.getPort()}/health`,
+    );
+    const b = body as Record<string, unknown>;
+    expect(b.workspaces).toEqual({ count: 0, active: null });
+  });
+
+  it('omits the workspaces field when no registry is injected (backwards compat)', async () => {
+    env.server = new HealthEndpoint({
+      metrics: new MetricsRegistry(),
+      activePortFilePath: env.activePortFile,
+      logsDir: env.logsDir,
+      coreVersionResolver: async () => 'unknown',
+      serverVersion: '0.9.0',
+      channelStatusProvider: () => ({ editor: 'ok', runtime: 'ok', cli: 'ok' }),
+    });
+    await env.server.start();
+
+    const { body } = await fetchJson(
+      `http://127.0.0.1:${env.server.getPort()}/health`,
+    );
+    const b = body as Record<string, unknown>;
+    expect(b.workspaces).toBeUndefined();
   });
 });
 

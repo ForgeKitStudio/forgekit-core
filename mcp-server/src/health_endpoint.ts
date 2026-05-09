@@ -31,6 +31,7 @@ import {
   HEALTH_RANGE,
   scanFreePort,
 } from './port_scanner.js';
+import type { ProjectRegistry } from './projects/registry.js';
 
 /** Per-channel status summary shipped by `channelStatusProvider`. */
 export type ChannelName = 'ok' | 'degraded' | 'down';
@@ -56,6 +57,13 @@ export interface HealthEndpointOptions {
   channelStatusProvider: () => HealthChecks;
   /** Test-only clock override. Defaults to `() => new Date()`. */
   clock?: () => Date;
+  /**
+   * Optional ProjectRegistry. When supplied, `/health` responses
+   * gain a `workspaces: {count, active}` field summarising the
+   * registry state. Omitted-field fallback preserves backwards
+   * compatibility with callers that predate Phase 7.
+   */
+  registry?: ProjectRegistry;
 }
 
 /** Default number of recent days of log files to scan for /trace. */
@@ -143,9 +151,17 @@ export class HealthEndpoint {
   private serveHealth(res: ServerResponse): void {
     const checks = this.opts.channelStatusProvider();
     const status = rollupStatus(checks);
+    const body: Record<string, unknown> = { status, checks };
+    if (this.opts.registry !== undefined) {
+      const active = this.opts.registry.getActive();
+      body.workspaces = {
+        count: this.opts.registry.size(),
+        active: active?.workspace_id ?? null,
+      };
+    }
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ status, checks }));
+    res.end(JSON.stringify(body));
   }
 
   // -------------------------------------------------------------------

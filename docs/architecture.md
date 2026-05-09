@@ -34,7 +34,7 @@ graph LR
 - **AI agent** — any MCP-aware LLM client (Claude Desktop, Claude Code,
   Cursor, Cline, Copilot, Antigravity, Windsurf, Kiro). Talks to the MCP
   server over stdio JSON-RPC 2.0.
-- **MCP server (`@forgekit/core-mcp`)** — the only process the agent
+- **MCP server (`@forgekitstudio/core-mcp`)** — the only process the agent
   connects to. It multiplexes requests across the three channels below and
   enforces profile-level tool filtering, auth, and rate limits.
 - **ForgeKit Core addon** — the MIT-licensed Godot 4.x addon that ships
@@ -81,7 +81,7 @@ the right channel per tool.
   poll against the GitHub `releases/latest` endpoint of
   `ForgeKitStudio/forgekit-core`. When a newer Core version is
   detected, a single `UPDATE_AVAILABLE: ForgeKit Core v<new> available
-  (running v<current>). Run 'npx -y @forgekit/core-mcp@latest' to
+  (running v<current>). Run 'npx -y @forgekitstudio/core-mcp@latest' to
   upgrade.` line is appended to `editor.get_output_log`, so MCP
   clients that scrape the editor log stream surface the notice
   without any extra wiring. Polls are throttled to once per hour via
@@ -221,7 +221,7 @@ channels, so a single request can be followed from the agent through
 the server into the editor plugin or the runtime bridge by grepping
 one field.
 
-### Server side — `@forgekit/core-mcp`
+### Server side — `@forgekitstudio/core-mcp`
 
 - **Destination.** One file per UTC day at
   `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`. The directory is created
@@ -271,7 +271,7 @@ an error. A dispatch that returns an empty dictionary (a notification
 without a reply) still counts as a success against
 `mcp.requests.total`.
 
-### Server side — `@forgekit/core-mcp`
+### Server side — `@forgekitstudio/core-mcp`
 
 The canonical names are exported from
 `mcp-server/src/observability/metrics.ts` as

@@ -5,7 +5,7 @@
  * The originals live in `forgekit-rpg/tools/verify-manifest-tag.js` and
  * are embedded in the shell script through `node --input-type=module`.
  * This module is a byte-for-byte TypeScript port of those helpers kept
- * inside the `@forgekit/core-mcp` package so the ForgeKit Core MCP
+ * inside the `@forgekitstudio/core-mcp` package so the ForgeKit Core MCP
  * Server can property-test the contract without importing across
  * repositories.
  *
