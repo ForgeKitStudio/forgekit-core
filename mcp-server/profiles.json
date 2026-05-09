@@ -187,6 +187,132 @@
       "scope": "module",
       "channel": "runtime",
       "module": "stats"
+    },
+    {
+      "name": "effects.apply",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.remove",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.list_active",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.tick_advance",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.list_resources",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.create_resource",
+      "scope": "module",
+      "channel": "editor",
+      "module": "effects"
+    },
+    {
+      "name": "effects.validate_resource",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "magic.cast",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.list_spells",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.get_spell",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.create_spell",
+      "scope": "module",
+      "channel": "editor",
+      "module": "magic"
+    },
+    {
+      "name": "magic.update_spell",
+      "scope": "module",
+      "channel": "editor",
+      "module": "magic"
+    },
+    {
+      "name": "magic.delete_spell",
+      "scope": "module",
+      "channel": "editor",
+      "module": "magic"
+    },
+    {
+      "name": "magic.get_cooldowns",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.reset_cooldowns",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "equipment.equip",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.unequip",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.get_slot",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.snapshot",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.list_slots",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.configure_slots",
+      "scope": "module",
+      "channel": "editor",
+      "module": "equipment"
     }
   ]
 }
