@@ -175,7 +175,7 @@ export async function runHook(
   const messagePath = argv[2];
   if (messagePath === undefined) {
     io.writeStderr(
-      '[@forgekit/core-mcp] commit-msg hook: missing commit message file path argument.\n',
+      '[@forgekitstudio/core-mcp] commit-msg hook: missing commit message file path argument.\n',
     );
     io.exit(1);
     return;
@@ -187,7 +187,7 @@ export async function runHook(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     io.writeStderr(
-      `[@forgekit/core-mcp] commit-msg hook: failed to read "${messagePath}": ${message}\n`,
+      `[@forgekitstudio/core-mcp] commit-msg hook: failed to read "${messagePath}": ${message}\n`,
     );
     io.exit(1);
     return;
@@ -214,7 +214,7 @@ export async function runHook(
   };
 
   io.writeStderr(
-    '[@forgekit/core-mcp] commit-msg rejected the commit. Details:\n',
+    '[@forgekitstudio/core-mcp] commit-msg rejected the commit. Details:\n',
   );
   io.writeStderr(`${JSON.stringify(payload)}\n`);
   io.exit(1);
@@ -242,7 +242,7 @@ if (isInvokedDirectly()) {
   runHook(process.argv, io).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(
-      `[@forgekit/core-mcp] commit-msg hook crashed: ${message}\n`,
+      `[@forgekitstudio/core-mcp] commit-msg hook crashed: ${message}\n`,
     );
     process.exit(1);
   });

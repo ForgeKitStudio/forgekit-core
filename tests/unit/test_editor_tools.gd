@@ -14,7 +14,7 @@ extends GutTest
 ##   editor.get_undo_stack(max?)                 → {entries}
 ##
 ## Plus the canonical `UPDATE_AVAILABLE` entry shape used by the MCP Server
-## when it detects a newer ForgeKit_Core or @forgekit/core-mcp release and
+## when it detects a newer ForgeKit_Core or @forgekitstudio/core-mcp release and
 ## wants the entry to appear in the editor output log.
 
 
@@ -334,7 +334,7 @@ func test_get_output_log_includes_update_available_entries_from_backend() -> voi
 	# the backend's output-log buffer. The adapter itself must not filter
 	# or transform the entry — it forwards whatever the backend returns.
 	var entry: Dictionary = EDITOR_TOOLS_SCRIPT.build_update_available_entry(
-		"@forgekit/core-mcp", "0.1.3", "0.2.0"
+		"@forgekitstudio/core-mcp", "0.1.3", "0.2.0"
 	)
 	backend.log_lines = [entry]
 
@@ -342,7 +342,7 @@ func test_get_output_log_includes_update_available_entries_from_backend() -> voi
 	var lines: Array = (result as Dictionary).get("lines", [])
 	assert_eq(lines.size(), 1, "UPDATE_AVAILABLE entry reaches the caller via get_output_log")
 	assert_eq((lines[0] as Dictionary).get("kind", ""), "UPDATE_AVAILABLE", "Entry kind preserved through the adapter")
-	assert_eq((lines[0] as Dictionary).get("component", ""), "@forgekit/core-mcp", "component preserved")
+	assert_eq((lines[0] as Dictionary).get("component", ""), "@forgekitstudio/core-mcp", "component preserved")
 
 
 # ---------------------------------------------------------------------------

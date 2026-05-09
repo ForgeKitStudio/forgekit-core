@@ -12,7 +12,7 @@ ForgeKit.
 This project is based on the [ForgeKit Core](https://github.com/ForgeKitStudio/forgekit-core)
 template repository, a modular AI-native starter kit for Godot 4.x. ForgeKit
 Core ships as an addon under `addons/forgekit_core/` and exposes an MCP server
-(`@forgekit/core-mcp`) for editor, CLI, and runtime integrations. The optional
+(`@forgekitstudio/core-mcp`) for editor, CLI, and runtime integrations. The optional
 paid **ForgeKit RPG Module** lives under `addons/forgekit_rpg/` and bundles
 Combat, Crafting, Inventory, and Stats subsystems behind a single license. The
 rest of the repository (scenes, gameplay scripts, custom resources) is owned
@@ -172,7 +172,7 @@ at most once per hour (rate-limit cache lives under
 `user://mcp_update_check.json`), compares the returned `tag_name`
 to the running Core version, and formats a single
 `UPDATE_AVAILABLE: ForgeKit Core v<new> available (running v<current>).
-Run 'npx -y @forgekit/core-mcp@latest' to upgrade.` line for
+Run 'npx -y @forgekitstudio/core-mcp@latest' to upgrade.` line for
 `editor.get_output_log`. The HTTP client is injected so the checker
 runs headlessly under tests and silently no-ops on network failure.
 

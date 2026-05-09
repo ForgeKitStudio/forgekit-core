@@ -15,7 +15,7 @@ running game through a stable tool surface.
 
 - [Godot](https://godotengine.org/) 4.3 or newer.
 - [Node.js](https://nodejs.org/) 20 or newer (required by the
-  `@forgekit/core-mcp` package).
+  `@forgekitstudio/core-mcp` package).
 - `npm` 10 or newer (ships with Node.js 20).
 
 ## Compared to
@@ -62,7 +62,7 @@ paid **ForgeKit RPG Module**.
    [Required git hooks](#required-git-hooks) for what they do and why they
    are required):
    ```sh
-   npx -y @forgekit/core-mcp install-hooks
+   npx -y @forgekitstudio/core-mcp install-hooks
    ```
    The `-y` flag skips the interactive install prompt so the command can
    be run non-interactively in CI and setup scripts.
@@ -80,7 +80,7 @@ paid **ForgeKit RPG Module**.
    ForgeKit Core**.
 8. Launch the MCP server in the `RPG-only` profile:
    ```sh
-   npx -y @forgekit/core-mcp --profile RPG-only
+   npx -y @forgekitstudio/core-mcp --profile RPG-only
    ```
 9. Activate the module license through your MCP client:
    ```
@@ -93,14 +93,14 @@ paid **ForgeKit RPG Module**.
 
 ForgeKit ships three independent update channels, one per product.
 
-- **MCP Server (`@forgekit/core-mcp`).** Run
-  `npx -y @forgekit/core-mcp@latest` to pull the newest version from
+- **MCP Server (`@forgekitstudio/core-mcp`).** Run
+  `npx -y @forgekitstudio/core-mcp@latest` to pull the newest version from
   npm. The editor plugin polls the GitHub releases endpoint once per
   hour; when a newer ForgeKit Core version is detected it appends a
   single line to `editor.get_output_log`:
   ```
   UPDATE_AVAILABLE: ForgeKit Core v<new> available (running v<current>).
-  Run 'npx -y @forgekit/core-mcp@latest' to upgrade.
+  Run 'npx -y @forgekitstudio/core-mcp@latest' to upgrade.
   ```
   Clients that scrape the editor log stream (Kiro, Claude Code,
   Cursor, ...) surface the notice without any extra wiring. The
@@ -130,12 +130,12 @@ ForgeKit ships three independent update channels, one per product.
 ## Required git hooks
 
 > **Required after cloning.** Before making any commits, run
-> `npx @forgekit/core-mcp install-hooks` from the repository root. The same
+> `npx @forgekitstudio/core-mcp install-hooks` from the repository root. The same
 > rules are enforced by CI, so running the hooks locally catches failures
 > before they block your pull request.
 
 ```sh
-npx -y @forgekit/core-mcp install-hooks
+npx -y @forgekitstudio/core-mcp install-hooks
 ```
 
 Run this command once, immediately after your first `git clone` (or after
@@ -185,7 +185,7 @@ forgekit-core/
 ├── addons/
 │   ├── forgekit_core/          # This addon — MIT. Event bus, resources, MCP bridge.
 │   └── forgekit_rpg/           # Placeholder for the paid RPG module (purchase required).
-├── mcp-server/                 # @forgekit/core-mcp Node.js server (published to npm).
+├── mcp-server/                 # @forgekitstudio/core-mcp Node.js server (published to npm).
 ├── docs/                       # Architecture notes, MCP API reference, SKILLS pack.
 ├── tests/                      # GUT unit, property, integration, and static tests.
 ├── tools/                      # CLI helpers (run_tests.sh, check_imports.sh).
@@ -199,16 +199,16 @@ forgekit-core/
 ## Installing and running the MCP server
 
 The MCP server ships as the npm package
-[`@forgekit/core-mcp`](https://www.npmjs.com/package/@forgekit/core-mcp).
+[`@forgekitstudio/core-mcp`](https://www.npmjs.com/package/@forgekitstudio/core-mcp).
 The recommended way to run it is through `npx`, which fetches the latest
 published version on demand and exits cleanly after the server stops.
 
 ```sh
 # Fetch and run the server non-interactively.
-npx -y @forgekit/core-mcp --profile Full
+npx -y @forgekitstudio/core-mcp --profile Full
 
 # Pin a specific version to avoid surprises during long sessions.
-npx -y @forgekit/core-mcp@0.1.0 --profile Lite
+npx -y @forgekitstudio/core-mcp@0.1.0 --profile Lite
 ```
 
 `-y` skips the `npx` interactive install prompt; use it whenever the
@@ -219,7 +219,7 @@ prompt, drop the `-y`.
 Once installed globally or through `npx`, the executable is exposed as
 `forgekit-mcp`. That binary accepts the same flags as the `npx` form
 (for example `forgekit-mcp --profile RPG-only`); the examples in this
-README use `npx -y @forgekit/core-mcp` so they work without a global
+README use `npx -y @forgekitstudio/core-mcp` so they work without a global
 install.
 
 ### Profiles
@@ -436,7 +436,7 @@ enforces both halves of this rule.
 
 On the MCP server side, `test_report.serialize` and `test_report.parse`
 are backed by `serializeTestReport` and `parseTestReport` in
-`@forgekit/core-mcp`. They use the same JSON shape as the GDScript
+`@forgekitstudio/core-mcp`. They use the same JSON shape as the GDScript
 producer, but the server parser is **strict**: any malformed input
 (non-string payload, invalid JSON, wrong root type, missing or mistyped
 field, non-object entry in `tests[]` or `assertions[]`) raises

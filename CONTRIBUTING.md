@@ -10,7 +10,7 @@ All communication in this repository, including issues, pull requests, commit me
 2. Clone your fork or the main repository locally.
 3. Open the project in Godot 4.3+ and verify that it launches without errors.
 4. Install the MCP server dependencies: `cd mcp-server && npm ci`.
-5. Install the git hooks: `npx @forgekit/core-mcp install-hooks`.
+5. Install the git hooks: `npx @forgekitstudio/core-mcp install-hooks`.
 6. Run the test suite once before making changes: `bash tools/cli_runner/run_tests.sh`.
 
 ## Branch Strategy

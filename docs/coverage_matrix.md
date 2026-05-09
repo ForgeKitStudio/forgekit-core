@@ -200,7 +200,7 @@ requirements receive a ⚠️ flag.
 | ❌ | Req 37 — Topologia repozytoriów (historyczna) | 37.5 — WHEN AI_Agent wywołuje `project.list_modules`, THE MCP_Server SHALL zwracać dla ForgeKit_RPG_Module pole `license_id` różne od `MIT`. | _(none)_ |
 | ❌ | Req 38 — Kanały aktualizacji | 38.1 — WHEN MCP_Server wykryje dostępną nowszą wersję ForgeKit_Core lub MCP_Server, THE MCP_Editor_Plugin SHALL opublikować wpis `UPDATE_AVAILABLE` w strumieniu `ed… | _(none)_ |
 | ❌ | Req 38 — Kanały aktualizacji | 38.2 — WHEN AI_Agent wywołuje `runtime.handshake`, THE MCP_Server SHALL zwrócić dodatkowe pole `server.latest_version` zawierające numer najnowszej dostępnej wersji. | _(none)_ |
-| ❌ | Req 38 — Kanały aktualizacji | 38.3 — THE MCP_Server SHALL być aktualizowalny poleceniem `npx -y @forgekit/core-mcp@latest`. | _(none)_ |
+| ❌ | Req 38 — Kanały aktualizacji | 38.3 — THE MCP_Server SHALL być aktualizowalny poleceniem `npx -y @forgekitstudio/core-mcp@latest`. | _(none)_ |
 | ❌ | Req 38 — Kanały aktualizacji | 38.4 — THE ForgeKit_Core SHALL być aktualizowalny przez akcję "Update" w Godot AssetLib. | _(none)_ |
 | ❌ | Req 38 — Kanały aktualizacji | 38.5 — WHEN użytkownik otrzymuje email z itch.io lub Gumroad z linkiem do nowszej wersji ForgeKit_RPG_Module, THE user SHALL instalować nową wersję przez rozpakowan… | _(none)_ |
 | ❌ | Req 38 — Kanały aktualizacji | 38.6 — WHEN Module_Installer wykrywa zainstalowany moduł z wersją `core_min_version` wyższą niż zainstalowany ForgeKit_Core, THE `modules.check_compatibility` SHALL… | _(none)_ |

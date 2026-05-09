@@ -32,7 +32,7 @@ When reporting, please include:
 2. We triage and confirm the issue within **10 business days**.
 3. We prepare a fix on a private branch and coordinate a release with the reporter.
 4. We publish a security advisory with credit to the reporter (unless anonymity is requested).
-5. We release a patched version on npm (`@forgekit/core-mcp`) and GitHub Releases, and notify downstream consumers via the changelog.
+5. We release a patched version on npm (`@forgekitstudio/core-mcp`) and GitHub Releases, and notify downstream consumers via the changelog.
 
 ## Scope
 
@@ -40,7 +40,7 @@ In scope:
 
 - Code and assets in `addons/forgekit_core/`, `mcp-server/`, `docs/SKILLS/`.
 - Default CI workflows under `.github/workflows/`.
-- Git hooks shipped via `npx @forgekit/core-mcp install-hooks`.
+- Git hooks shipped via `npx @forgekitstudio/core-mcp install-hooks`.
 
 Out of scope:
 

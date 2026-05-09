@@ -85,8 +85,8 @@ describe('runInstallHooks — resolves git dir and calls installer', () => {
         return { installed: ['/repo/.git/hooks/commit-msg', '/repo/.git/hooks/pre-commit'], backedUp: [] };
       },
       resolveHookTargets: () => ({
-        commitMsgTarget: '/node_modules/@forgekit/core-mcp/dist/scripts/git-hooks/commit-msg.js',
-        preCommitTarget: '/node_modules/@forgekit/core-mcp/dist/scripts/git-hooks/pre-commit.js',
+        commitMsgTarget: '/node_modules/@forgekitstudio/core-mcp/dist/scripts/git-hooks/commit-msg.js',
+        preCommitTarget: '/node_modules/@forgekitstudio/core-mcp/dist/scripts/git-hooks/pre-commit.js',
       }),
       writeStderr: () => {},
     };
@@ -101,10 +101,10 @@ describe('runInstallHooks — resolves git dir and calls installer', () => {
     expect(opts.gitDir).toBe('/repo/.git');
     expect(opts.repoRoot).toBe('/repo');
     expect(opts.commitMsgTarget).toBe(
-      '/node_modules/@forgekit/core-mcp/dist/scripts/git-hooks/commit-msg.js',
+      '/node_modules/@forgekitstudio/core-mcp/dist/scripts/git-hooks/commit-msg.js',
     );
     expect(opts.preCommitTarget).toBe(
-      '/node_modules/@forgekit/core-mcp/dist/scripts/git-hooks/pre-commit.js',
+      '/node_modules/@forgekitstudio/core-mcp/dist/scripts/git-hooks/pre-commit.js',
     );
   });
 
@@ -136,7 +136,7 @@ describe('runInstallHooks — resolves git dir and calls installer', () => {
     const code = await runInstallHooks([], deps);
     expect(code).toBe(0);
     const out = stderrChunks.join('');
-    expect(out).toContain('[@forgekit/core-mcp]');
+    expect(out).toContain('[@forgekitstudio/core-mcp]');
     expect(out).toContain('commit-msg');
     expect(out).toContain('pre-commit');
   });

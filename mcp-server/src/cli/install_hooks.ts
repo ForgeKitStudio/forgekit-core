@@ -90,7 +90,7 @@ export async function runInstallHooks(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     deps.writeStderr(
-      `[@forgekit/core-mcp] install-hooks: could not resolve git directory — ${message}\n`,
+      `[@forgekitstudio/core-mcp] install-hooks: could not resolve git directory — ${message}\n`,
     );
     return 1;
   }
@@ -110,18 +110,18 @@ export async function runInstallHooks(
       preCommitTarget,
     });
     deps.writeStderr(
-      `[@forgekit/core-mcp] installed git hooks → ${result.installed.join(', ')}\n`,
+      `[@forgekitstudio/core-mcp] installed git hooks → ${result.installed.join(', ')}\n`,
     );
     if (result.backedUp.length > 0) {
       deps.writeStderr(
-        `[@forgekit/core-mcp] backed up previous hooks: ${result.backedUp.join(', ')}\n`,
+        `[@forgekitstudio/core-mcp] backed up previous hooks: ${result.backedUp.join(', ')}\n`,
       );
     }
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     deps.writeStderr(
-      `[@forgekit/core-mcp] install-hooks: installation failed — ${message}\n`,
+      `[@forgekitstudio/core-mcp] install-hooks: installation failed — ${message}\n`,
     );
     return 1;
   }

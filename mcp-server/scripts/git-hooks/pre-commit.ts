@@ -321,7 +321,7 @@ export async function runHook(io: HookIo): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     io.writeStderr(
-      `[@forgekit/core-mcp] pre-commit: could not parse .forgekit/context-map.json: ${message}\n`,
+      `[@forgekitstudio/core-mcp] pre-commit: could not parse .forgekit/context-map.json: ${message}\n`,
     );
     io.exit(1);
     return;
@@ -354,7 +354,7 @@ export async function runHook(io: HookIo): Promise<void> {
 
   if (stale.length > 0) {
     io.writeStderr(
-      '[@forgekit/core-mcp] pre-commit rejected the commit — context files are stale. Details:\n',
+      '[@forgekitstudio/core-mcp] pre-commit rejected the commit — context files are stale. Details:\n',
     );
     io.writeStderr(`${buildStaleError(stale)}\n`);
     io.exit(1);
@@ -392,7 +392,7 @@ if (isInvokedDirectly()) {
   runHook(io).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(
-      `[@forgekit/core-mcp] pre-commit hook crashed: ${message}\n`,
+      `[@forgekitstudio/core-mcp] pre-commit hook crashed: ${message}\n`,
     );
     process.exit(1);
   });

@@ -12,7 +12,7 @@ extends RefCounted
 ##     treat those as "no information, no update available").
 ##   - `format_log_line(latest_version) -> String` — builds the
 ##     documented `UPDATE_AVAILABLE: ForgeKit Core v<new> available
-##     (running v<current>). Run 'npx -y @forgekit/core-mcp@latest'
+##     (running v<current>). Run 'npx -y @forgekitstudio/core-mcp@latest'
 ##     to upgrade.` string.
 ##
 ## The HTTP client is injected so the checker runs headlessly under
@@ -103,7 +103,7 @@ func check(http_client: Object, now_unix_seconds: int) -> Dictionary:
 ## `editor.get_output_log`. The template matches the text documented
 ## in Requirement 38.1 / task 6.22.1.
 func format_log_line(latest_version: String) -> String:
-	return "UPDATE_AVAILABLE: ForgeKit Core v%s available (running v%s). Run 'npx -y @forgekit/core-mcp@latest' to upgrade." % [
+	return "UPDATE_AVAILABLE: ForgeKit Core v%s available (running v%s). Run 'npx -y @forgekitstudio/core-mcp@latest' to upgrade." % [
 		_strip_leading_v(latest_version),
 		_strip_leading_v(current_version),
 	]

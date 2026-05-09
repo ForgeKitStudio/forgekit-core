@@ -14,7 +14,7 @@ ForgeKit.
 This project is based on the [ForgeKit Core](https://github.com/ForgeKitStudio/forgekit-core)
 template repository, a modular AI-native starter kit for Godot 4.x. ForgeKit
 Core ships as an addon under `addons/forgekit_core/` and exposes an MCP server
-(`@forgekit/core-mcp`) for editor, CLI, and runtime integrations. The optional
+(`@forgekitstudio/core-mcp`) for editor, CLI, and runtime integrations. The optional
 paid **ForgeKit RPG Module** lives under `addons/forgekit_rpg/` and bundles
 Combat, Crafting, Inventory, and Stats subsystems behind a single license. The
 rest of the repository (scenes, gameplay scripts, custom resources) is owned

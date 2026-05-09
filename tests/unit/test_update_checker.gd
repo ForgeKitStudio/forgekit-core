@@ -146,4 +146,4 @@ func test_format_log_line_emits_update_available_template() -> void:
 	assert_true(line.begins_with("UPDATE_AVAILABLE:"), "Line must start with the UPDATE_AVAILABLE prefix")
 	assert_true(line.contains("v0.8.0"), "Line must mention the new version with a leading 'v'")
 	assert_true(line.contains("v0.7.0"), "Line must mention the running version with a leading 'v'")
-	assert_true(line.contains("npx -y @forgekit/core-mcp@latest"), "Line must point the user at the npx upgrade command")
+	assert_true(line.contains("npx -y @forgekitstudio/core-mcp@latest"), "Line must point the user at the npx upgrade command")

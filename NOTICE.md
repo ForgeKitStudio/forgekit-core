@@ -34,7 +34,7 @@ inside the repository for the canonical text.
 | --------------- | --------- | ----------------------------------------------- | ----------------------------------------------------------------- |
 | `addons/gut`    | MIT       | Godot Unit Test framework driving GUT suites.   | https://github.com/bitwes/Gut                                     |
 
-### `@forgekit/core-mcp` npm dependencies
+### `@forgekitstudio/core-mcp` npm dependencies
 
 The Node.js MCP server published from `mcp-server/` declares a small
 set of dependencies. Their licenses and roles are listed below; the

@@ -29,7 +29,7 @@ export interface ProjectInfoParams {
   /** Absolute path to the Godot project root (contains `project.godot`). */
   projectRoot: string;
   /**
-   * MCP server SemVer (`@forgekit/core-mcp` package version). Forwarded
+   * MCP server SemVer (`@forgekitstudio/core-mcp` package version). Forwarded
    * into the response so the caller doesn't need to resolve it itself.
    */
   apiVersion: string;

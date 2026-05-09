@@ -1,4 +1,4 @@
-# ForgeKit Core — npm package publisher for `@forgekit/core-mcp`.
+# ForgeKit Core — npm package publisher for `@forgekitstudio/core-mcp`.
 #
 # Triggered by pushing a tag matching `v*`. The `validate-tag` job guards
 # the pipeline against mismatched package.json / tag versions, and

@@ -46,14 +46,14 @@ The front matter format is:
 ---
 skill: <kebab-case-id>
 title: <short title>
-api_version: <semver matching @forgekit/core-mcp>
+api_version: <semver matching @forgekitstudio/core-mcp>
 updated: <YYYY-MM-DD>
 ---
 ```
 
 ## Versioning
 
-Skills are versioned together with the `@forgekit/core-mcp` package and the
+Skills are versioned together with the `@forgekitstudio/core-mcp` package and the
 `addons/forgekit_core/` addon. The `api_version` field in each skill file
 MUST match the major and minor version of the MCP server the skill targets.
 When a new ForgeKit Core version is released, every skill file is reviewed
@@ -79,7 +79,7 @@ To install the skills into your LLM client, copy the files from this directory
 into the client's skill directory, or run:
 
 ```sh
-npx @forgekit/core-mcp install-skills
+npx @forgekitstudio/core-mcp install-skills
 ```
 
 The `install-skills` command is introduced alongside the MCP server in a later

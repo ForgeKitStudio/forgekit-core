@@ -13,7 +13,7 @@ What problem does this feature solve? Who benefits from it (indie developer, stu
 ## Proposed Scope
 
 - [ ] `addons/forgekit_core/` (Godot addon)
-- [ ] `mcp-server/` (`@forgekit/core-mcp` npm package)
+- [ ] `mcp-server/` (`@forgekitstudio/core-mcp` npm package)
 - [ ] New MCP tool(s): `<category>.<tool>`
 - [ ] Documentation / SKILLS
 - [ ] CI / release tooling
