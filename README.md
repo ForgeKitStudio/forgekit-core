@@ -238,12 +238,30 @@ coupled and testable.
 
 ### Declared signals
 
+As of v0.5.0 the bus declares nine signals in total.
+
+Phase 0–3:
+
 | Signal               | Payload                                                          |
 | -------------------- | ---------------------------------------------------------------- |
 | `damage_dealt`       | `source: Node, target: Node, damage: float, damage_type: StringName` |
 | `crafting_completed` | `recipe_id: StringName, outputs: Array`                          |
 | `item_added`         | `item_id: StringName, amount: int`                               |
 | `item_removed`       | `item_id: StringName, amount: int`                               |
+
+Phase 4B (consumed by the RPG module's effects, magic, and equipment subsystems):
+
+| Signal                   | Payload                                                    |
+| ------------------------ | ---------------------------------------------------------- |
+| `status_effect_ticked`   | `owner: StringName, effect_id: StringName, tick_index: int` |
+| `status_effect_expired`  | `owner: StringName, effect_id: StringName`                 |
+| `spell_cast`             | `caster: StringName, spell_id: StringName, target: Node, status: StringName` |
+| `item_equipped`          | `owner: StringName, slot: StringName, item_id: StringName` |
+| `item_unequipped`        | `owner: StringName, slot: StringName, item_id: StringName` |
+
+For `spell_cast`, `status` is the `CastResult.Status` name (`ok`,
+`insufficient_mana`, `on_cooldown`, ...), so a single subscriber can react to
+both successful and failed casts.
 
 ### Public API
 

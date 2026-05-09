@@ -19,6 +19,29 @@ signal item_added(item_id: StringName, amount: int)
 ## Payload: item_id (StringName), amount (int)
 signal item_removed(item_id: StringName, amount: int)
 
+## Emitted each time a registered StatusEffect completes a tick (phase 4B).
+## Payload: owner (StringName), effect_id (StringName), tick_index (int)
+signal status_effect_ticked(owner: StringName, effect_id: StringName, tick_index: int)
+
+## Emitted when a StatusEffect's remaining_duration decays to zero and it
+## is automatically removed from the active set (phase 4B).
+## Payload: owner (StringName), effect_id (StringName)
+signal status_effect_expired(owner: StringName, effect_id: StringName)
+
+## Emitted when a spell cast completes (phase 4B). The `status` is the
+## CastResult.Status name (`ok`, `insufficient_mana`, `on_cooldown`, ...)
+## so a single subscriber can react to both successful and failed casts.
+## Payload: caster (StringName), spell_id (StringName), target (Node), status (StringName)
+signal spell_cast(caster: StringName, spell_id: StringName, target: Node, status: StringName)
+
+## Emitted when an EquipableItemResource is successfully equipped (phase 4B).
+## Payload: owner (StringName), slot (StringName), item_id (StringName)
+signal item_equipped(owner: StringName, slot: StringName, item_id: StringName)
+
+## Emitted when an EquipableItemResource is removed from a slot (phase 4B).
+## Payload: owner (StringName), slot (StringName), item_id (StringName)
+signal item_unequipped(owner: StringName, slot: StringName, item_id: StringName)
+
 
 ## Schema: signal name -> ordered list of expected argument type names.
 ## Type names are human-readable strings reused in push_error messages.
@@ -27,6 +50,11 @@ const _SIGNAL_SCHEMAS: Dictionary = {
 	&"crafting_completed": ["StringName", "Array"],
 	&"item_added": ["StringName", "int"],
 	&"item_removed": ["StringName", "int"],
+	&"status_effect_ticked": ["StringName", "StringName", "int"],
+	&"status_effect_expired": ["StringName", "StringName"],
+	&"spell_cast": ["StringName", "StringName", "Node", "StringName"],
+	&"item_equipped": ["StringName", "StringName", "StringName"],
+	&"item_unequipped": ["StringName", "StringName", "StringName"],
 }
 
 

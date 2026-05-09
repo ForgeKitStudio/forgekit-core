@@ -31,7 +31,12 @@ func _init() -> void:
 		return
 
 	var sources: Array = (parsed as Dictionary)["sources"]
-	var validator: GDScriptValidator = GDScriptValidatorScript.new()
+	# Typed as `Object` rather than `GDScriptValidator` so the driver
+	# compiles in headless checkouts where the editor has not yet
+	# populated `.godot/global_script_class_cache.cfg`. The concrete
+	# script is still loaded via the preloaded `GDScriptValidatorScript`
+	# constant, so runtime behavior is identical.
+	var validator: Object = GDScriptValidatorScript.new()
 	var results: Array = []
 
 	for i in range(sources.size()):

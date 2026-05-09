@@ -30,7 +30,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GODOT_VERSION: "4.3.0"
+  # CI runs against Godot 4.6.2 to match forgekit-rpg. The Core module
+  # still supports Godot 4.3+ at the source level — 4.6.2 is the current
+  # CI target, not a new minimum on the consumer side.
+  GODOT_VERSION: "4.6.2"
 
 jobs:
   # -------------------------------------------------------------------------
@@ -102,6 +105,18 @@ jobs:
         working-directory: mcp-server
         run: npm ci
 
+      - name: Pre-warm Godot global class cache
+        # The property tests that shell out to Godot rely on class_name
+        # resolution for types like `GDScriptValidator` across multiple
+        # source files. In a fresh CI checkout
+        # `.godot/global_script_class_cache.cfg` does not exist and
+        # headless `--script` invocations cannot resolve cross-file
+        # class references. Running `--editor --quit` once populates
+        # the cache (and the asset-import cache) so every subsequent
+        # spawn starts from a warm state.
+        shell: bash
+        run: godot --headless --editor --quit --path .
+
       - name: Run fast-check property tests (Vitest)
         # Vitest propagates the exit code from the fast-check runner, so a
         # failing property surfaces its counterexample in stderr and turns
@@ -141,22 +156,21 @@ jobs:
           use-dotnet: false
 
       - name: Run Gameplay Test Runner scenarios
-        # Phase 0: no scenarios exist under `tests/integration/scenes/` yet.
-        # Emit a placeholder green result. Once scenarios exist, iterate
-        # over each `.tscn` and run it through the MCP bridge runner; any
-        # non-zero exit fails the job.
-        #
-        # TODO(phase-1): replace the placeholder with the real scenario
-        # loop driven by `godot --headless --mcp-bridge --scene=<scenario>`.
+        # GUT-driven integration tests that load a scene fixture and
+        # assert the end-to-end flow through the public API. GUT is
+        # vendored under `addons/gut/` in the full developer checkout
+        # but the public repository ships without it (it is pulled in
+        # on demand by the tests-unit setup). Gate on the addon's
+        # presence to keep CI green in checkouts that do not vendor
+        # it, matching the tests-unit and CoreFuzz jobs.
         shell: bash
         run: |
           set -euo pipefail
-          scenario_dir="tests/integration/scenes"
-          if [ -d "$scenario_dir" ] && compgen -G "$scenario_dir/*.tscn" > /dev/null; then
-            for scenario in "$scenario_dir"/*.tscn; do
-              echo "Running gameplay scenario: $scenario"
-              godot --headless --mcp-bridge --scene="$scenario"
-            done
+          scenario_dir="tests/integration"
+          if [ -d "$scenario_dir" ] \
+             && compgen -G "$scenario_dir/test_*.gd" > /dev/null \
+             && [ -f "addons/gut/gut_cmdln.gd" ]; then
+            godot --headless --path . --script addons/gut/gut_cmdln.gd -gdir=res://tests/integration -gexit
           else
             echo "placeholder — gameplay scenarios not yet present (phase 0)"
           fi
