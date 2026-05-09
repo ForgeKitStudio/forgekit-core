@@ -42,6 +42,25 @@ signal item_equipped(owner: StringName, slot: StringName, item_id: StringName)
 ## Payload: owner (StringName), slot (StringName), item_id (StringName)
 signal item_unequipped(owner: StringName, slot: StringName, item_id: StringName)
 
+## Emitted whenever XP is granted to an owner (phase 5). Fires once per
+## `XPSystem.grant_xp(...)` call, before any resulting level-up signals.
+## `source` identifies the XP origin — `&"manual"` for direct grants,
+## `&"kill"` when driven by the `died` signal, `&"quest"` for quest
+## rewards (phase 8) — so subscribers can route XP popups to the right
+## UI channel.
+## Payload: owner (StringName), amount (float), source (StringName)
+signal xp_gained(owner: StringName, amount: float, source: StringName)
+
+## Emitted each time an owner crosses the XP threshold for the next
+## level (phase 5). Fires once per level crossed; a single grant_xp
+## that spans multiple levels produces N sequential signals.
+## `reward_tier` echoes `LevelUpRewardResource.unlock_tier` (or `&""`
+## when the level-up applied no reward), so UI can group the event
+## into warrior / mage / boss panels without inspecting the reward
+## resource itself.
+## Payload: owner (StringName), new_level (int), reward_tier (StringName)
+signal leveled_up(owner: StringName, new_level: int, reward_tier: StringName)
+
 
 ## Schema: signal name -> ordered list of expected argument type names.
 ## Type names are human-readable strings reused in push_error messages.
@@ -55,6 +74,8 @@ const _SIGNAL_SCHEMAS: Dictionary = {
 	&"spell_cast": ["StringName", "StringName", "Node", "StringName"],
 	&"item_equipped": ["StringName", "StringName", "StringName"],
 	&"item_unequipped": ["StringName", "StringName", "StringName"],
+	&"xp_gained": ["StringName", "float", "StringName"],
+	&"leveled_up": ["StringName", "int", "StringName"],
 }
 
 

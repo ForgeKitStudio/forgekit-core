@@ -48,13 +48,13 @@ is the single cross-system signal hub. Subscribers connect with
 type-checks the payload against a declared schema and surfaces mismatches
 through `push_error` instead of letting them propagate silently.
 
-Declaring a new global signal is a Core change (v0.5.0: nine signals declared, see reference below): it must be added to
+Declaring a new global signal is a Core change (v0.6.0: eleven signals declared, see reference below): it must be added to
 `game_events.gd` together with an entry in the internal `_SIGNAL_SCHEMAS`
 dictionary. Client code may not redeclare or shadow these signals.
 
-As of v0.5.0 the bus declares nine signals in total; see the full reference below.
+As of v0.6.0 the bus declares eleven signals in total; see the full reference below.
 
-### Declared signals (9 total as of v0.5.0)
+### Declared signals (11 total as of v0.6.0)
 
 Phase 0–3:
 
@@ -70,6 +70,11 @@ Phase 4B additions (consumed by the RPG module's effects / magic / equipment sub
 - `spell_cast(caster: StringName, spell_id: StringName, target: Node, status: StringName)` — a spell cast completes; the `status` is the `CastResult.Status` name (`ok`, `insufficient_mana`, `on_cooldown`, ...).
 - `item_equipped(owner: StringName, slot: StringName, item_id: StringName)` — an `EquipableItemResource` is successfully slotted.
 - `item_unequipped(owner: StringName, slot: StringName, item_id: StringName)` — an item is removed from a slot.
+
+Phase 5 additions (consumed by the RPG module's progression subsystem):
+
+- `xp_gained(owner: StringName, amount: float, source: StringName)` — fires once per `XPSystem.grant_xp(...)` call, before any level-up signals. `source` identifies the XP origin: `&"manual"` (direct grant), `&"kill"` (driven by `died` in phase 6), `&"quest"` (phase 8).
+- `leveled_up(owner: StringName, new_level: int, reward_tier: StringName)` — fires once per level crossed. `reward_tier` echoes `LevelUpRewardResource.unlock_tier` (or `&""` when the level-up applied no reward) so UI can group events into warrior / mage / boss panels.
 
 ## Resources
 
