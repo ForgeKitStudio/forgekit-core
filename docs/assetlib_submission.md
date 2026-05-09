@@ -29,7 +29,7 @@ default, assembles a download URL of the form
    - **Title**, **Version**, **Category**, **Support level**,
      **Author**, **License**, **Description** — direct copy.
    - **Godot version** — the minimum Godot version the addon parses
-     cleanly against (default `4.3`). Keep this aligned with the
+     cleanly against (default `4.6`). Keep this aligned with the
      `[application] config/features=PackedStringArray(...)` line in
      `project.godot`.
    - **Download provider** — GitHub.

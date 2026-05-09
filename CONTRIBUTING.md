@@ -190,7 +190,7 @@ In emergencies (hotfix, hook malfunction, cherry-pick of a legacy commit), you m
    - **Gameplay Scenarios**: paste the JSON output of `tests.run_gameplay`.
    - **Affected MCP Tools**: list any MCP tools whose contract changed, formatted as `<category>.<tool>`.
    - **Breaking Changes**: link to the relevant CHANGELOG entry and the `api.version` bump.
-3. Ensure every required status check passes: `ci / tests-unit`, `ci / tests-property`, `ci / tests-gameplay`, `ci / check-imports`, `ci / language-policy`, `ci / check-pr-template`.
+3. Ensure every required status check passes: `ci / tests-unit`, `ci / tests-property`, `ci / tests-gameplay`, `ci / check-imports`, `ci / language-policy`, `ci / coverage-matrix`, `ci / check-pr-template`.
 4. Request review from a maintainer. Address feedback by pushing additional commits rather than force-pushing, unless the branch is `feature/ai-iteration/*`.
 5. A maintainer merges the pull request using squash merge or rebase, preserving the Conventional Commit message.
 

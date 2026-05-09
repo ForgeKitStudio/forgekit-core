@@ -165,6 +165,13 @@ function classifyRpgFile(
   const segments = relFile.split('/');
   const subsystem = segments.length >= 4 ? segments[2] : '';
 
+  // `public_api.gd` is the explicit aggregator: rule 1.3 requires other
+  // subsystems to reach each other through it, which means public_api
+  // itself necessarily imports from every subsystem. Exempt it from the
+  // cross-subsystem check — it still may not reach OTHER forgekit_*
+  // modules (rule 1.2), only its own subsystems.
+  const isPublicApi = relFile === 'addons/forgekit_rpg/public_api.gd';
+
   const bad: string[] = [];
   let rule13Reason: string | null = null;
   for (const target of imports) {
@@ -178,6 +185,8 @@ function classifyRpgFile(
       ) {
         continue;
       }
+      // public_api.gd re-exports every subsystem by design.
+      if (isPublicApi) continue;
       bad.push(target);
       rule13Reason =
         'forgekit_rpg subsystems must reach other subsystems only through ' +

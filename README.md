@@ -7,13 +7,13 @@ running game through a stable tool surface.
 
 <!-- Badges are placeholders. Wire to real CI/NPM/AssetLib URLs after Phase 0. -->
 ![status](https://img.shields.io/badge/status-alpha-orange)
-![godot](https://img.shields.io/badge/godot-4.3%2B-blue)
+![godot](https://img.shields.io/badge/godot-4.6%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![mcp](https://img.shields.io/badge/mcp-ready-purple)
 
 ## Prerequisites
 
-- [Godot](https://godotengine.org/) 4.3 or newer.
+- [Godot](https://godotengine.org/) 4.6 or newer.
 - [Node.js](https://nodejs.org/) 20 or newer (required by the
   `@forgekitstudio/core-mcp` package).
 - `npm` 10 or newer (ships with Node.js 20).
@@ -51,7 +51,7 @@ paid **ForgeKit RPG Module**.
 1. Click **Use this template** on
    [ForgeKitStudio/forgekit-core](https://github.com/ForgeKitStudio/forgekit-core)
    to create your own GitHub repository.
-2. Clone your new repository and open the folder in Godot 4.3 or newer.
+2. Clone your new repository and open the folder in Godot 4.6 or newer.
 3. Install the MCP server:
    ```sh
    cd mcp-server
@@ -187,7 +187,7 @@ forgekit-core/
 │   └── forgekit_rpg/           # Placeholder for the paid RPG module (purchase required).
 ├── mcp-server/                 # @forgekitstudio/core-mcp Node.js server (published to npm).
 ├── docs/                       # Architecture notes, MCP API reference, SKILLS pack.
-├── tests/                      # GUT unit, property, integration, and static tests.
+├── tests/                      # GUT unit, property, integration, smoke, and static tests.
 ├── tools/                      # CLI helpers (run_tests.sh, check_imports.sh, run_check_imports.mjs).
 ├── .github/                    # Issue templates, PR template, CI workflows.
 ├── CLAUDE.md                   # Context file for AI agents.
@@ -494,7 +494,7 @@ the new value.
   Unknown sections resolve to `{ "settings": {} }`.
 
 Values are returned verbatim — exactly the text to the right of `=` in
-`project.godot`. Godot literals such as `PackedStringArray("4.3", "Forward
+`project.godot`. Godot literals such as `PackedStringArray("4.6", "Forward
 Plus")` or quoted strings like `"ForgeKit Core Template"` are not coerced;
 the caller owns interpretation.
 

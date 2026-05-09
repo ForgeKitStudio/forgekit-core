@@ -553,7 +553,9 @@ the repository root and exits `1` when violations are found):
    A file under `addons/forgekit_rpg/combat/` that directly `preload`s
    `res://addons/forgekit_rpg/inventory/...` is flagged as a violation.
    This keeps the four subsystems independently testable and keeps the
-   public module surface narrow.
+   public module surface narrow. `public_api.gd` itself is the explicit
+   aggregator and is allowed to import from every subsystem; rule 1 still
+   applies to it, so it may not reach any other `forgekit_*` addon.
 
 The MCP server exposes the same tool (`project.check_imports`) to agents
 and to CI, so the rule cannot drift between the two contexts.
