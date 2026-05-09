@@ -77,6 +77,17 @@ the right channel per tool.
   `node.set_property`, `resource.load`, `resource.save`,
   `resource.inspect`, `transaction.begin` / `commit` / `rollback`,
   `gdscript.save_with_validation`, `project.list_modules`.
+- **Update notifications.** The plugin runs a periodic, rate-limited
+  poll against the GitHub `releases/latest` endpoint of
+  `ForgeKitStudio/forgekit-core`. When a newer Core version is
+  detected, a single `UPDATE_AVAILABLE: ForgeKit Core v<new> available
+  (running v<current>). Run 'npx -y @forgekit/core-mcp@latest' to
+  upgrade.` line is appended to `editor.get_output_log`, so MCP
+  clients that scrape the editor log stream surface the notice
+  without any extra wiring. Polls are throttled to once per hour via
+  a cache at `user://mcp_update_check.json`, and network failures are
+  swallowed silently (no update is advertised, and the cache is only
+  written on a successful fetch).
 - **Tool-category adapters registered at startup.** On `_enter_tree`
   the plugin's lifecycle helper (`McpEditorPluginLifecycle`) registers
   each editor-channel tool family on the JSON-RPC dispatcher through a

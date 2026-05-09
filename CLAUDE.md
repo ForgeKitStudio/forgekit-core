@@ -164,6 +164,18 @@ receives one `mcp.requests.total` increment per dispatch and an
 additional `mcp.requests.errors` increment when the response is a
 JSON-RPC error envelope.
 
+Phase 6B also adds `McpUpdateChecker` at
+`addons/forgekit_core/mcp/editor_plugin/update_checker.gd`. The
+checker polls
+`https://api.github.com/repos/ForgeKitStudio/forgekit-core/releases/latest`
+at most once per hour (rate-limit cache lives under
+`user://mcp_update_check.json`), compares the returned `tag_name`
+to the running Core version, and formats a single
+`UPDATE_AVAILABLE: ForgeKit Core v<new> available (running v<current>).
+Run 'npx -y @forgekit/core-mcp@latest' to upgrade.` line for
+`editor.get_output_log`. The HTTP client is injected so the checker
+runs headlessly under tests and silently no-ops on network failure.
+
 ## MCP runtime bridge
 
 Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
@@ -321,6 +333,14 @@ JSON-RPC request end-to-end, and an in-memory metrics registry.
     - `GET /trace/:trace_id` — the last 100 JSONL entries matching
       `trace_id`, scanning the last 7 days of log files and sorted
       by `ts` ascending.
+- **Update channel.** `mcp-server/src/tools/runtime_bridge/handshake.ts`
+  exposes `readLatestVersionFromCache(path)`, which reads the
+  `mcp_update_check.json` cache written by the editor-plugin's
+  `McpUpdateChecker` and returns the latest version string when an
+  update is available (or `null` otherwise). The runtime bridge uses
+  this to populate the `server.latest_version` field of the
+  `runtime.handshake` response. See the **Updating** section of
+  `README.md` for the end-user-facing upgrade command.
 
 ## Git hooks
 

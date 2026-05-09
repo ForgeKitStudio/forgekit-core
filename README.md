@@ -65,6 +65,44 @@ paid **ForgeKit RPG Module**.
 10. Call `crafting.execute("iron_ingot")` from the same MCP client and watch
     the item appear in the inventory.
 
+## Updating
+
+ForgeKit ships three independent update channels, one per product.
+
+- **MCP Server (`@forgekit/core-mcp`).** Run
+  `npx -y @forgekit/core-mcp@latest` to pull the newest version from
+  npm. The editor plugin polls the GitHub releases endpoint once per
+  hour; when a newer ForgeKit Core version is detected it appends a
+  single line to `editor.get_output_log`:
+  ```
+  UPDATE_AVAILABLE: ForgeKit Core v<new> available (running v<current>).
+  Run 'npx -y @forgekit/core-mcp@latest' to upgrade.
+  ```
+  Clients that scrape the editor log stream (Kiro, Claude Code,
+  Cursor, ...) surface the notice without any extra wiring. The
+  one-hour rate limit is enforced through a small cache at
+  `user://mcp_update_check.json`; delete that file if you want to
+  force an immediate re-check. Network failures (offline, DNS error,
+  non-200 response) are silent: the checker reports no update rather
+  than surfacing a false positive, and the cache is only written on a
+  successful fetch so the next call retries.
+- **ForgeKit Core addon (`addons/forgekit_core/`).** Replace the
+  directory with the newest release tarball, or pull the update
+  through Godot's AssetLib "Update" action. The addon never rewrites
+  itself in place.
+- **ForgeKit RPG Module (`addons/forgekit_rpg/`).** Replace the
+  module directory with the newest ZIP from
+  [itch.io](https://forgekitstudio.itch.io/forgekit-rpg) or
+  [Gumroad](https://forgekitstudio.gumroad.com/l/forgekit-rpg). After
+  extracting, call `modules.check_compatibility(module_id=
+  "forgekit_rpg")` — the tool compares the module's
+  `core_min_version` against the installed Core version and returns
+  `{compatible: false, required, installed}` when the module needs a
+  newer Core than you have. `modules.check_compatibility` is the
+  authoritative source of truth for module / Core version
+  compatibility; agents MUST consult it before activating a module
+  and SHOULD consult it after every update.
+
 ## Required git hooks
 
 > **Required after cloning.** Before making any commits, run

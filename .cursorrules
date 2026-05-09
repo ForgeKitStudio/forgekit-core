@@ -162,6 +162,14 @@ envelope on the incoming request or minted fresh when absent), and
 `mcp.requests.total` and `mcp.requests.errors` increments per
 dispatch.
 
+Phase 6B also adds `McpUpdateChecker` at
+`addons/forgekit_core/mcp/editor_plugin/update_checker.gd`. The
+checker polls the GitHub releases endpoint at most once per hour
+(rate-limit cache at `user://mcp_update_check.json`) and formats an
+`UPDATE_AVAILABLE:` line for `editor.get_output_log` when a newer
+Core version is detected. The HTTP client is injected so the
+checker runs headlessly under tests.
+
 ## MCP runtime bridge
 
 Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
@@ -284,6 +292,10 @@ Phase 6B adds three observability primitives on the server side.
   `mcp_active_port.json` under the `"health"` key. Routes:
   `GET /health`, `GET /metrics` (Prometheus text), `GET /version`,
   `GET /trace/:trace_id` (up to 100 entries, last 7 days of logs).
+- **Update channel.** `mcp-server/src/tools/runtime_bridge/handshake.ts`
+  exposes `readLatestVersionFromCache(path)` to source the
+  `server.latest_version` field of `runtime.handshake` from the
+  editor-plugin's update-check cache. See `README.md#updating`.
 
 ## Git hooks
 

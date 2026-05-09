@@ -2015,3 +2015,30 @@ Content-Type: application/json
 Reads every `<logsDir>/<YYYY-MM-DD>.jsonl` file for the last 7 days,
 keeps only lines whose `trace_id` matches the URL parameter, sorts
 them ascending by `ts`, and caps the response at 100 entries.
+
+### Routing and method constraints
+
+- Only `GET` is accepted. Any other method returns
+  `405 Method Not Allowed`.
+- Unknown paths return `404 Not Found`.
+- The paths above are matched exactly, except for `/trace/:trace_id`,
+  which accepts any URL-encoded `trace_id` segment after `/trace/`.
+
+### Active-port file atomicity
+
+The endpoint updates `mcp_active_port.json` through a sibling
+`.tmp` file plus a rename, so a concurrent reader observes either
+the complete previous contents or the complete new contents —
+never a truncated file. Sibling keys written by the other channels
+(`editor`, `runtime`, `visualizer`) are read, merged, and rewritten
+verbatim so starting the health endpoint never clobbers their
+active-port entries. If the rename fails the temp file is cleaned
+up and the original file is left byte-for-byte intact.
+
+### Port-range exhaustion
+
+If every port in the Health range `6040-6049` is already bound on
+`127.0.0.1`, `HealthEndpoint.start()` rejects with a
+`PORT_RANGE_EXHAUSTED` error. No HTTP server is left listening and
+`mcp_active_port.json` is not modified; callers can retry after
+freeing a port in the range.

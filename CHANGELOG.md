@@ -86,6 +86,34 @@ every published tag has a matching entry.
     - `GET /trace/:trace_id` — the last 100 JSONL entries (across
       the last 7 UTC days) matching the supplied `trace_id`, sorted
       by `ts` ascending.
+  - **Update channels (Phase 6.22).**
+    - `addons/forgekit_core/mcp/editor_plugin/update_checker.gd`
+      (`class_name McpUpdateChecker`) polls the GitHub releases
+      endpoint for `ForgeKitStudio/forgekit-core` at most once per
+      hour and appends a single
+      `UPDATE_AVAILABLE: ForgeKit Core v<new> available (running
+      v<current>). Run 'npx -y @forgekit/core-mcp@latest' to
+      upgrade.` line to `editor.get_output_log` when a newer Core
+      version is detected. The HTTP client is injected so the
+      checker runs headlessly under tests and silently no-ops on
+      network failure. Rate-limit cache lives at
+      `user://mcp_update_check.json`.
+    - `mcp-server/src/tools/runtime_bridge/handshake.ts` exposes
+      `readLatestVersionFromCache(path)` so the runtime bridge can
+      populate the `server.latest_version` field of the
+      `runtime.handshake` response from the same cache. Returns
+      `null` when no newer version is known.
+    - `modules.check_compatibility` result shape extended with
+      `required` and `installed` aliases for `core_min_version` /
+      `core_version` so callers following the requirements-document
+      language (`{compatible: false, required, installed}`) can
+      read the same fact without reshaping the result client-side.
+      Existing `core_min_version` / `core_version` fields are
+      preserved.
+    - `README.md` now carries an **Updating** section documenting
+      `npx -y @forgekit/core-mcp@latest`, the `UPDATE_AVAILABLE`
+      signal, and `modules.check_compatibility` as the
+      authoritative tool for module / Core compatibility checks.
 
 ### Added (Phase 6A — previous sub-delivery)
 

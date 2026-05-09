@@ -53,6 +53,15 @@ export interface CheckCompatibilityResult {
   compatible: boolean;
   core_version: string;
   core_min_version: string;
+  /**
+   * Alias for `core_min_version`. Surfaced under the shorter name so
+   * callers following the requirements-document language (which calls
+   * the fields `required` and `installed`) can read the same fact
+   * without duplicating the comparator logic on the caller side.
+   */
+  required: string;
+  /** Alias for `core_version`. See `required` for the rationale. */
+  installed: string;
   module_id: string;
   reason?: string;
 }
@@ -111,6 +120,8 @@ export async function checkCompatibility(
       compatible: false,
       core_version: coreVersion,
       core_min_version: coreMin,
+      required: coreMin,
+      installed: coreVersion,
       module_id: params.moduleId,
       reason: `core_min_version "${coreMin}" is malformed`,
     }, params.logger);
@@ -120,6 +131,8 @@ export async function checkCompatibility(
       compatible: false,
       core_version: coreVersion,
       core_min_version: coreMin,
+      required: coreMin,
+      installed: coreVersion,
       module_id: params.moduleId,
       reason: `core_version "${coreVersion}" is malformed`,
     }, params.logger);
@@ -130,6 +143,8 @@ export async function checkCompatibility(
     compatible,
     core_version: coreVersion,
     core_min_version: coreMin,
+    required: coreMin,
+    installed: coreVersion,
     module_id: params.moduleId,
   };
   if (!compatible) {
