@@ -10,7 +10,7 @@ part through the three MCP channels.
 ```mermaid
 graph LR
     AI[AI_Agent<br/>LLM client]
-    MCP[MCP Server<br/>&#64;forgekit/core-mcp<br/>Node.js]
+    MCP[MCP Server<br/>&#64;forgekitstudio/core-mcp<br/>Node.js]
     Editor[Editor Plugin<br/>WebSocket 6010-6019]
     CLI[CLI Runner<br/>spawn godot --headless]
     Runtime[Runtime Bridge<br/>UDP 6020-6029]
@@ -360,7 +360,7 @@ generator, self-healing loop), and the Phase 6 observability layer
 graph LR
     Agent[AI Agent<br/>LLM client]
     CLI[CLI<br/>forgekit-mcp --stdio]
-    Server[MCP Server<br/>&#64;forgekit/core-mcp]
+    Server[MCP Server<br/>&#64;forgekitstudio/core-mcp]
     Editor[Editor Plugin<br/>WebSocket 6010-6019]
     Visualizer[Browser Visualizer<br/>HTTP 6030-6039]
     AssetGen[Asset Generator<br/>editor adapter]
@@ -542,7 +542,10 @@ addons/forgekit_rpg/
 ### Boundary rules
 
 Two import rules are statically enforced by `project.check_imports` and
-by the `tools/cli_runner/check_imports.sh` helper:
+by two local helpers: `tools/cli_runner/check_imports.sh` (CI-facing
+shell wrapper) and `tools/run_check_imports.mjs` (Node helper that calls
+the compiled `mcp-server/dist/src/tools/project/check_imports.js` against
+the repository root and exits `1` when violations are found):
 
 1. **Core may not import from any `forgekit_<module>/` tree.** ForgeKit
    Core ignores whether the RPG addon is installed.

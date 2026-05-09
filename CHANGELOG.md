@@ -10,6 +10,50 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+### Added
+
+- **Task 7 final validation gate:**
+  - `mcp-server/test/ci_workflows.test.ts` — smoke test that pins
+    `.github/workflows/{ci,release,npm-publish}.yml` filenames and
+    their mandatory jobs / trigger shapes, so a cleanup cannot
+    silently delete the workflow contract (Req 43.1–43.8).
+  - `mcp-server/test/profile_tool_counts.test.ts` — end-to-end
+    assertions that `profiles.json` honours the Full ≥ 215,
+    Minimal ≤ 40, Lite = scope:core thresholds and that the
+    `forgekit_rpg` license unlocks every RPG subsystem module
+    (Req 19.1, 19.3, 19.4, 20.1–20.4, 51.4, 57.2, 67.10, 67.11).
+  - `mcp-server/test/documentation_contracts.test.ts` — six
+    assertions that pin the external / UX contracts documented in
+    README / CONTRIBUTING / CLAUDE.md / docs/mcp_api.md / SKILLS
+    for Req 5.4, 38.3, 38.4, 38.5, 39.3, 42.6.
+  - `tests/smoke/test_spec_artifacts.gd` — Godot-side smoke test
+    that locks down GUT installation, SKILLS package contents and
+    sections, Template Repository context files, and the README
+    Quickstart anchor (Req 4.1, 4.2, 12.1, 29.1–29.4, 39.1, 39.4,
+    45.1–45.5).
+  - `tools/test-requirement-map.js` — additive manifest mapping
+    repo-relative test files to the acceptance criteria they
+    exercise. Keeps the test bodies free of spec annotations while
+    the coverage matrix stays auto-generated.
+  - `tools/verify_rpg_profile.mjs`, `tools/verify_req_coverage.mjs`,
+    `tools/list_gaps.mjs` — reusable diagnostics for future audits.
+
+- **MCP tool surface expansion.** `mcp-server/profiles.json` now
+  lists every editor-plugin, runtime-bridge, MCP server and RPG
+  subsystem tool that is implemented in the codebase. Total tool
+  count grew from 177 to 271 entries (Full profile); Minimal stays
+  at 21 (≤ 40 threshold); `forgekit_rpg` license unlocks 98 tools
+  across 15 RPG modules. Every entry carries `scope` / `channel` /
+  `module` attributes (Req 19.1, 19.3, 19.4, 20.1–20.4).
+
+### Changed
+
+- `tools/generate-coverage-matrix.js` reads the optional
+  `tools/test-requirement-map.js` manifest as an additive coverage
+  source. Tests that declare their own `_Wymagania:` or `Validates:`
+  header still win on their own; the manifest only adds coverage.
+  Result: 46/46 requirements fully covered in `docs/coverage_matrix.md`.
+
 ## [0.9.0] - 2026-05-09
 
 ### Added

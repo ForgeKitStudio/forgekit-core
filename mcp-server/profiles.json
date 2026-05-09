@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "description": "Skeleton tool profile definitions for @forgekitstudio/core-mcp. Populated with a representative subset of tools; the full 215-tool surface is added in later phases.",
+  "description": "Tool surface manifest for @forgekitstudio/core-mcp. Lists every editor-plugin, runtime-bridge, MCP server, and RPG-module tool that may be exposed to clients. Profile filtering is applied at runtime based on scope / channel / module attributes and the active license keys.",
   "tools": [
     {
       "name": "project.info",
@@ -1060,6 +1060,570 @@
     },
     {
       "name": "android.run_logcat",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "batch.dry_run",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "batch.execute",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.clear_output",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.focus_node",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_errors",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_output_log",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_selection",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_undo_stack",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.redo",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.set_selection",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.undo",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "gdscript.save_with_validation",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "gdscript.validate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.call_method",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "node.connect_signal",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.disconnect_signal",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.duplicate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.find_by_name",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.find_by_type",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.get_properties",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.get_property",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.get_signals",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.remove",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.rename",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.reparent",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.find_unused_assets",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.move_file",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.organize_imports",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.rename_class",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.rename_method",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.apply_fix",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.duplicate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.inspect",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.list_by_type",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.load",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.save",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "runtime.change_scene",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.emit_event",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.eval_safe",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_autoload",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_current_scene",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_fps",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_logs",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_scene_tree",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_time_scale",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.handshake",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "runtime.heartbeat",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "runtime.is_connected",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "runtime.list_autoloads",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.pause",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.reload_current_scene",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.resume",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.screenshot",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.set_time_scale",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.shutdown",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "scene.close",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.get_tree",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.get_tree_snapshot",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "scene.instantiate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.list_open",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.save",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.save_as",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "script.attach",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.detach",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.get_documentation",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.list_classes",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.load",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "transaction.begin",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "transaction.commit",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "transaction.rollback",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "analysis.count_nodes_by_type",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "analysis.dependency_graph",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "search.code",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "search.references",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "project.check_imports",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.get_settings",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.list_addons",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.reload",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.update_settings",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "modules.list",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.enable",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.disable",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.activate_license",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.check_compatibility",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.inspect_manifest",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.core_version",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_unit",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_suite",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_gameplay",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_property",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "test_report.parse",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "test_report.serialize",
       "scope": "core",
       "channel": "cli",
       "module": "core"

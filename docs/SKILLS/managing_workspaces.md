@@ -7,7 +7,7 @@ updated: 2026-05-09
 
 # Managing multiple Godot projects from one MCP server
 
-Use this skill when the user runs a single `@forgekit/core-mcp`
+Use this skill when the user runs a single `@forgekitstudio/core-mcp`
 process against more than one Godot project. Phase 7 introduces a
 `ProjectRegistry` plus five `project.*` tools so a single server
 instance can hold several workspaces at once, with per-workspace

@@ -188,7 +188,7 @@ forgekit-core/
 ├── mcp-server/                 # @forgekitstudio/core-mcp Node.js server (published to npm).
 ├── docs/                       # Architecture notes, MCP API reference, SKILLS pack.
 ├── tests/                      # GUT unit, property, integration, and static tests.
-├── tools/                      # CLI helpers (run_tests.sh, check_imports.sh).
+├── tools/                      # CLI helpers (run_tests.sh, check_imports.sh, run_check_imports.mjs).
 ├── .github/                    # Issue templates, PR template, CI workflows.
 ├── CLAUDE.md                   # Context file for AI agents.
 ├── .cursorrules                # Context file for Cursor (mirror of CLAUDE.md).
@@ -514,6 +514,10 @@ file, even if the server is killed mid-write. This is what lets
 `preload("res://...")`, `load("res://...")`, and `extends "res://..."`
 target, and reports any file that crosses a module boundary. CI and the
 `tools/cli_runner/check_imports.sh` helper call the same implementation.
+`tools/run_check_imports.mjs` is a Node-only counterpart that imports
+`mcp-server/dist/src/tools/project/check_imports.js` directly and exits
+with code `1` when violations are found — handy for running the check
+locally after `npm run build` without spawning a shell pipeline.
 
 ### Parameters
 

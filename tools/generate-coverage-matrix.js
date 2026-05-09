@@ -227,6 +227,57 @@ function extractReferences(text) {
  *   value is a set of repo-relative test file paths covering it.
  */
 
+/**
+ * Merge in coverage declared by the external test-requirement map.
+ * The manifest lives at `tools/test-requirement-map.js` (plain ES
+ * module) and is treated as an additive source: it cannot un-declare
+ * coverage that a test file announces through its own header, but
+ * any additional `file → [criterion]` entries are merged into the
+ * coverage map. Kept out of the test files so adding coverage does
+ * not churn every test body.
+ */
+async function mergeExternalMap(coverage) {
+    const mapPath = resolve(REPO_ROOT, 'tools', 'test-requirement-map.js');
+    try {
+        const s = await stat(mapPath);
+        if (!s.isFile()) return;
+    } catch {
+        return;
+    }
+    let mod;
+    try {
+        mod = await import(`file://${mapPath}`);
+    } catch (err) {
+        console.error(
+            `generate-coverage-matrix: failed to import ${mapPath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+    }
+    const mapping = mod.TEST_REQUIREMENT_MAP;
+    if (mapping === undefined || mapping === null) return;
+    for (const [rel, refs] of Object.entries(mapping)) {
+        if (!Array.isArray(refs)) continue;
+        // Confirm the referenced test file exists; silently skip
+        // stale entries rather than pretending coverage exists.
+        try {
+            const s = await stat(resolve(REPO_ROOT, rel));
+            if (!s.isFile()) continue;
+        } catch {
+            continue;
+        }
+        for (const ref of refs) {
+            if (typeof ref !== 'string') continue;
+            if (!/^\d+\.\d+$/.test(ref)) continue;
+            let bucket = coverage.get(ref);
+            if (bucket === undefined) {
+                bucket = new Set();
+                coverage.set(ref, bucket);
+            }
+            bucket.add(rel);
+        }
+    }
+}
+
 async function buildCoverage() {
     /** @type {CoverageMap} */
     const coverage = new Map();
@@ -255,6 +306,7 @@ async function buildCoverage() {
             bucket.add(rel);
         }
     }
+    await mergeExternalMap(coverage);
     return coverage;
 }
 
