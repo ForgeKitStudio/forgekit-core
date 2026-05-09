@@ -238,7 +238,7 @@ coupled and testable.
 
 ### Declared signals
 
-As of v0.5.0 the bus declares nine signals in total.
+The bus declares seventeen signals in total.
 
 Phase 0–3:
 
@@ -262,6 +262,45 @@ Phase 4B (consumed by the RPG module's effects, magic, and equipment subsystems)
 For `spell_cast`, `status` is the `CastResult.Status` name (`ok`,
 `insufficient_mana`, `on_cooldown`, ...), so a single subscriber can react to
 both successful and failed casts.
+
+Phase 5 (XP and level-up progression):
+
+| Signal        | Payload                                                      |
+| ------------- | ------------------------------------------------------------ |
+| `xp_gained`   | `owner: StringName, amount: float, source: StringName`       |
+| `leveled_up`  | `owner: StringName, new_level: int, reward_tier: StringName` |
+
+`xp_gained` fires once per `XPSystem.grant_xp(...)` call, before any
+resulting level-up signals. `source` identifies the XP origin — `&"manual"`
+for direct grants, `&"kill"` when driven by the `died` signal, `&"quest"`
+for quest rewards — so subscribers can route XP popups to the right UI
+channel. `leveled_up` fires once per level crossed; a single `grant_xp`
+call that spans multiple levels produces N sequential signals, and
+`reward_tier` echoes `LevelUpRewardResource.unlock_tier` (or `&""` when
+the level-up applied no reward).
+
+Phase 6 (world layer — death, loot, scene transitions, dialog, shops):
+
+| Signal                        | Payload                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| `died`                        | `victim: StringName, killer: StringName`                                                          |
+| `chest_opened`                | `chest_id: StringName, opener: StringName`                                                        |
+| `scene_transition_requested`  | `from_scene: String, to_scene: String, target_spawn_point: StringName`                            |
+| `dialog_started`              | `npc_id: StringName, dialog_tree_id: StringName`                                                  |
+| `dialog_completed`            | `npc_id: StringName, dialog_tree_id: StringName, outcome: StringName`                             |
+| `shop_transaction`            | `actor: StringName, vendor_id: StringName, transaction_type: StringName, item_id: StringName, amount: int, currency_delta: int` |
+
+`died.killer` is `&""` for environmental, suicide, or poison-tick deaths.
+`chest_opened` fires exactly once per chest instance even if the chest is
+interacted with again afterwards. `scene_transition_requested` announces
+intent only — the event bus does not change scenes itself; gameplay code
+drives the actual `SceneTree.change_scene_to_file` and snaps the player
+to `target_spawn_point`. `dialog_completed.outcome` is an optional
+StringName tag the dialog author can attach to the terminal node (for
+example `&"quest_accepted"`); it is `&""` when no outcome tag was set.
+For `shop_transaction`, `transaction_type` is `&"buy"` or `&"sell"`, and
+`currency_delta` is the net change in currency on `actor`'s side:
+negative on buy (spent gold), positive on sell (received gold).
 
 ### Public API
 

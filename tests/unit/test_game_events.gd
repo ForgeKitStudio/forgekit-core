@@ -4,13 +4,19 @@ extends GutTest
 
 
 const EXPECTED_SIGNALS: Array = [
+	"chest_opened",
 	"crafting_completed",
 	"damage_dealt",
+	"dialog_completed",
+	"dialog_started",
+	"died",
 	"item_added",
 	"item_equipped",
 	"item_removed",
 	"item_unequipped",
 	"leveled_up",
+	"scene_transition_requested",
+	"shop_transaction",
 	"spell_cast",
 	"status_effect_expired",
 	"status_effect_ticked",
@@ -55,13 +61,19 @@ func after_each() -> void:
 	_received_item_unequipped.clear()
 	_received_xp_gained.clear()
 	_received_leveled_up.clear()
+	_received_died.clear()
+	_received_chest_opened.clear()
+	_received_scene_transition_requested.clear()
+	_received_dialog_started.clear()
+	_received_dialog_completed.clear()
+	_received_shop_transaction.clear()
 
 
 func test_list_signals_returns_all_declared_signal_names() -> void:
 	var result: Variant = _bus().call("list_signals")
 	assert_true(result is Array, "list_signals must return an Array")
 	var names: Array = result
-	assert_eq(names.size(), 11, "Expected exactly eleven declared global signals after phase 5 additions")
+	assert_eq(names.size(), 17, "Expected exactly seventeen declared global signals after phase 6 additions")
 	for expected in EXPECTED_SIGNALS:
 		assert_true(names.has(expected), "Expected signal '%s' to be declared" % expected)
 
@@ -383,4 +395,276 @@ func test_leveled_up_is_declared_and_validated() -> void:
 	)
 	assert_false(bad, "leveled_up new_level must be int; String must be rejected")
 	assert_eq(_received_leveled_up.size(), 0)
+	assert_push_error_count(1)
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 additions — world layer signals
+# ---------------------------------------------------------------------------
+
+var _received_died: Array = []
+var _received_chest_opened: Array = []
+var _received_scene_transition_requested: Array = []
+var _received_dialog_started: Array = []
+var _received_dialog_completed: Array = []
+var _received_shop_transaction: Array = []
+
+
+func _on_died(victim: StringName, killer: StringName) -> void:
+	_received_died.append([victim, killer])
+
+
+func _on_chest_opened(chest_id: StringName, opener: StringName) -> void:
+	_received_chest_opened.append([chest_id, opener])
+
+
+func _on_scene_transition_requested(from_scene: String, to_scene: String, target_spawn_point: StringName) -> void:
+	_received_scene_transition_requested.append([from_scene, to_scene, target_spawn_point])
+
+
+func _on_dialog_started(npc_id: StringName, dialog_tree_id: StringName) -> void:
+	_received_dialog_started.append([npc_id, dialog_tree_id])
+
+
+func _on_dialog_completed(npc_id: StringName, dialog_tree_id: StringName, outcome: StringName) -> void:
+	_received_dialog_completed.append([npc_id, dialog_tree_id, outcome])
+
+
+func _on_shop_transaction(
+	actor: StringName,
+	vendor_id: StringName,
+	transaction_type: StringName,
+	item_id: StringName,
+	amount: int,
+	currency_delta: int
+) -> void:
+	_received_shop_transaction.append(
+		[actor, vendor_id, transaction_type, item_id, amount, currency_delta]
+	)
+
+
+func test_died_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("died"))
+
+	_bus().connect(&"died", Callable(self, "_on_died"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"died",
+		[StringName("goblin_1"), StringName("player")]
+	)
+
+	assert_true(ok, "well-typed died must propagate")
+	assert_eq(_received_died.size(), 1)
+	if _received_died.size() == 1:
+		assert_eq(_received_died[0][0], StringName("goblin_1"))
+		assert_eq(_received_died[0][1], StringName("player"))
+
+	_received_died.clear()
+	# Empty killer StringName is valid for environmental / suicide deaths.
+	var ok_env: bool = _bus().call(
+		"emit_validated",
+		&"died",
+		[StringName("player"), StringName("")]
+	)
+	assert_true(ok_env, "empty killer StringName must be accepted")
+	assert_eq(_received_died.size(), 1)
+
+	_received_died.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"died",
+		[StringName("goblin_1"), "player"]  # killer must be StringName, String rejected
+	)
+	assert_false(bad, "died killer must be StringName; String must be rejected")
+	assert_eq(_received_died.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_chest_opened_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("chest_opened"))
+
+	_bus().connect(&"chest_opened", Callable(self, "_on_chest_opened"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"chest_opened",
+		[StringName("common_chest_01"), StringName("player")]
+	)
+
+	assert_true(ok, "well-typed chest_opened must propagate")
+	assert_eq(_received_chest_opened.size(), 1)
+	if _received_chest_opened.size() == 1:
+		assert_eq(_received_chest_opened[0][0], StringName("common_chest_01"))
+		assert_eq(_received_chest_opened[0][1], StringName("player"))
+
+	_received_chest_opened.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"chest_opened",
+		[StringName("common_chest_01"), 42]  # opener must be StringName, int rejected
+	)
+	assert_false(bad, "chest_opened opener must be StringName; int must be rejected")
+	assert_eq(_received_chest_opened.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_scene_transition_requested_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("scene_transition_requested"))
+
+	_bus().connect(
+		&"scene_transition_requested",
+		Callable(self, "_on_scene_transition_requested")
+	)
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"scene_transition_requested",
+		["res://scenes/village.tscn", "res://scenes/dungeon.tscn", StringName("dungeon_entry")]
+	)
+
+	assert_true(ok, "well-typed scene_transition_requested must propagate")
+	assert_eq(_received_scene_transition_requested.size(), 1)
+	if _received_scene_transition_requested.size() == 1:
+		assert_eq(_received_scene_transition_requested[0][0], "res://scenes/village.tscn")
+		assert_eq(_received_scene_transition_requested[0][1], "res://scenes/dungeon.tscn")
+		assert_eq(_received_scene_transition_requested[0][2], StringName("dungeon_entry"))
+
+	_received_scene_transition_requested.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"scene_transition_requested",
+		[
+			StringName("res://scenes/village.tscn"),  # must be String, StringName rejected
+			"res://scenes/dungeon.tscn",
+			StringName("dungeon_entry"),
+		]
+	)
+	assert_false(bad, "scene_transition_requested from_scene must be String; StringName must be rejected")
+	assert_eq(_received_scene_transition_requested.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_dialog_started_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("dialog_started"))
+
+	_bus().connect(&"dialog_started", Callable(self, "_on_dialog_started"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"dialog_started",
+		[StringName("village_elder"), StringName("elder_greeting")]
+	)
+
+	assert_true(ok, "well-typed dialog_started must propagate")
+	assert_eq(_received_dialog_started.size(), 1)
+	if _received_dialog_started.size() == 1:
+		assert_eq(_received_dialog_started[0][0], StringName("village_elder"))
+		assert_eq(_received_dialog_started[0][1], StringName("elder_greeting"))
+
+	_received_dialog_started.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"dialog_started",
+		[StringName("village_elder")]  # wrong arity (missing dialog_tree_id)
+	)
+	assert_false(bad, "dialog_started must reject wrong arity")
+	assert_eq(_received_dialog_started.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_dialog_completed_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("dialog_completed"))
+
+	_bus().connect(&"dialog_completed", Callable(self, "_on_dialog_completed"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"dialog_completed",
+		[StringName("village_elder"), StringName("elder_greeting"), StringName("quest_accepted")]
+	)
+
+	assert_true(ok, "well-typed dialog_completed must propagate")
+	assert_eq(_received_dialog_completed.size(), 1)
+	if _received_dialog_completed.size() == 1:
+		assert_eq(_received_dialog_completed[0][2], StringName("quest_accepted"))
+
+	_received_dialog_completed.clear()
+	# Empty outcome StringName is valid when dialog ends without a tagged outcome.
+	var ok_empty: bool = _bus().call(
+		"emit_validated",
+		&"dialog_completed",
+		[StringName("village_elder"), StringName("elder_greeting"), StringName("")]
+	)
+	assert_true(ok_empty, "empty outcome StringName must be accepted")
+	assert_eq(_received_dialog_completed.size(), 1)
+
+	_received_dialog_completed.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"dialog_completed",
+		[StringName("village_elder"), StringName("elder_greeting"), 42]  # outcome must be StringName
+	)
+	assert_false(bad, "dialog_completed outcome must be StringName; int must be rejected")
+	assert_eq(_received_dialog_completed.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_shop_transaction_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("shop_transaction"))
+
+	_bus().connect(&"shop_transaction", Callable(self, "_on_shop_transaction"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"shop_transaction",
+		[
+			StringName("player"),
+			StringName("general_store"),
+			StringName("buy"),
+			StringName("health_potion"),
+			3,
+			-30,
+		]
+	)
+
+	assert_true(ok, "well-typed shop_transaction must propagate")
+	assert_eq(_received_shop_transaction.size(), 1)
+	if _received_shop_transaction.size() == 1:
+		assert_eq(_received_shop_transaction[0][2], StringName("buy"))
+		assert_eq(_received_shop_transaction[0][4], 3)
+		assert_eq(_received_shop_transaction[0][5], -30)
+
+	_received_shop_transaction.clear()
+	# Sell transactions use positive currency_delta.
+	var ok_sell: bool = _bus().call(
+		"emit_validated",
+		&"shop_transaction",
+		[
+			StringName("player"),
+			StringName("weapons_shop"),
+			StringName("sell"),
+			StringName("iron_sword"),
+			1,
+			20,
+		]
+	)
+	assert_true(ok_sell, "sell shop_transaction must propagate")
+	assert_eq(_received_shop_transaction.size(), 1)
+
+	_received_shop_transaction.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"shop_transaction",
+		[
+			StringName("player"),
+			StringName("general_store"),
+			StringName("buy"),
+			StringName("health_potion"),
+			3.0,  # amount must be int, float rejected
+			-30,
+		]
+	)
+	assert_false(bad, "shop_transaction amount must be int; float must be rejected")
+	assert_eq(_received_shop_transaction.size(), 0)
 	assert_push_error_count(1)

@@ -48,13 +48,13 @@ is the single cross-system signal hub. Subscribers connect with
 type-checks the payload against a declared schema and surfaces mismatches
 through `push_error` instead of letting them propagate silently.
 
-Declaring a new global signal is a Core change (v0.6.0: eleven signals declared, see reference below): it must be added to
+Declaring a new global signal is a Core change (v0.7.0: seventeen signals declared, see reference below): it must be added to
 `game_events.gd` together with an entry in the internal `_SIGNAL_SCHEMAS`
 dictionary. Client code may not redeclare or shadow these signals.
 
-As of v0.6.0 the bus declares eleven signals in total; see the full reference below.
+As of v0.7.0 the bus declares seventeen signals in total; see the full reference below.
 
-### Declared signals (11 total as of v0.6.0)
+### Declared signals (17 total as of v0.7.0)
 
 Phase 0–3:
 
@@ -75,6 +75,15 @@ Phase 5 additions (consumed by the RPG module's progression subsystem):
 
 - `xp_gained(owner: StringName, amount: float, source: StringName)` — fires once per `XPSystem.grant_xp(...)` call, before any level-up signals. `source` identifies the XP origin: `&"manual"` (direct grant), `&"kill"` (driven by `died` in phase 6), `&"quest"` (phase 8).
 - `leveled_up(owner: StringName, new_level: int, reward_tier: StringName)` — fires once per level crossed. `reward_tier` echoes `LevelUpRewardResource.unlock_tier` (or `&""` when the level-up applied no reward) so UI can group events into warrior / mage / boss panels.
+
+Phase 6 additions (consumed by the RPG module's enemies / world / npc / vendor subsystems):
+
+- `died(victim: StringName, killer: StringName)` — an entity's HP reached zero. `killer` is `&""` for environmental, suicide, or poison-tick deaths. The XPSystem subscribes to this signal to auto-grant XP to the killer.
+- `chest_opened(chest_id: StringName, opener: StringName)` — a `TreasureChest` was interacted with and its loot has been rolled. Fires exactly once per chest instance.
+- `scene_transition_requested(from_scene: String, to_scene: String, target_spawn_point: StringName)` — a `Door` or `Portal` asks gameplay code to change scenes. The event bus announces intent only; gameplay code performs the actual transition.
+- `dialog_started(npc_id: StringName, dialog_tree_id: StringName)` — a `DialogRunner` began a conversation.
+- `dialog_completed(npc_id: StringName, dialog_tree_id: StringName, outcome: StringName)` — a `DialogRunner` ended a conversation. `outcome` is the optional StringName tag on the terminal node (for example `&"quest_accepted"`), or `&""` when untagged.
+- `shop_transaction(actor: StringName, vendor_id: StringName, transaction_type: StringName, item_id: StringName, amount: int, currency_delta: int)` — a `Vendor.buy` or `Vendor.sell` completed. `transaction_type` is `&"buy"` or `&"sell"`; `currency_delta` is negative on buy, positive on sell.
 
 ## Resources
 

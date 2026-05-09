@@ -554,10 +554,12 @@ Tools for Scene, Node, Input, Runtime, Animation, TileMap, Theme,
 Batch/Refactor, Shader, Export, Resource, Physics, 3D Scene, Particle,
 Navigation, Audio, AnimationTree, State Machine, Blend Tree,
 Analysis/Search, Android Deploy, Module Management, Self-Healing, Asset
-Generation, and Visualizer ship across later milestones (v0.2 through
+Generation, Progression, Enemies, Loot, Spawner, World, NPC, Dialog,
+Vendor, and Visualizer ship across later milestones (v0.2 through
 v1.0). Each of those tools follows the same JSON-RPC 2.0 envelope and
 the same error-code conventions described above. See the design
-document for the full inventory and the phase in which each tool lands.
+document for the full inventory and the phase in which each tool
+lands.
 
 ## Profiling category
 
