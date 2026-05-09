@@ -1,6 +1,6 @@
 {
     "name": "@forgekit/core-mcp",
-    "version": "0.0.0",
+    "version": "0.8.0",
     "description": "ForgeKit Core MCP Server — bridges LLM clients to the Godot 4.x editor plugin and runtime bridge. Phase 0 skeleton; full tool surface is populated in Phase 1.",
     "license": "MIT",
     "type": "module",

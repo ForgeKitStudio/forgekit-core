@@ -10,6 +10,8 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-09
+
 ### Added
 
 - **Phase 6B — SKILLS pack completion + observability foundation:**
@@ -389,7 +391,8 @@ every published tag has a matching entry.
   workflows, git hook installer (`commit-msg`, `pre-commit`) covering
   Conventional Commits and Context Commits enforcement.
 
-[Unreleased]: https://github.com/ForgeKitStudio/forgekit-core/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ForgeKitStudio/forgekit-core/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.6.0
 [0.5.1]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.5.1
