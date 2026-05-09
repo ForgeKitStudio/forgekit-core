@@ -1,10 +1,78 @@
-# MCP API — v0.1 MVP
+# MCP API
 
-This document describes the MVP tool surface exposed by
-`@forgekit/core-mcp` in the v0.1 ForgeKit_Core milestone. The full target
-of 215 tools across 34 categories is tracked in the design document; the
-shapes below cover what ships in v0.1 and are stable from this milestone
-onward.
+This document describes the tool surface exposed by
+`@forgekit/core-mcp`. The v0.1 MVP shapes below are stable from that
+milestone onward; Phase 6A adds fourteen editor/CLI-channel tool
+categories that bring the full surface to 215 tools across 34
+categories, tracked in the design document.
+
+## Tools by category
+
+The table below is the single-source index for every category shipped
+through the server. Each entry links to the section that documents
+the category in detail.
+
+| Category | Channel(s) | Summary |
+| :------- | :--------- | :------ |
+| [Project](#project-category) | editor, cli | Project root inspection, module listing, boundary checks, atomic `project.godot` reads/writes, addon enumeration. |
+| [Testing / QA](#testingqa-category) | cli | Headless GUT, gameplay, and property-based runs returning a canonical `TestReport`. |
+| [Script](#script-category-preview) | cli, editor | GDScript parsing and save-with-validation. |
+| [Profiling](#profiling-category) | runtime | Samples from the Godot `Performance` singleton on the running game. |
+| [Runtime](#runtime-category) | runtime | Scene-tree introspection and scene control on the running game. |
+| [Module management](#module-management-category) | editor, cli | Lifecycle of installed `forgekit_*` modules (list, inspect, compat check, license activation, enable/disable). |
+| [Animation](#animation-category) | editor | `AnimationPlayer` introspection and UndoRedo-wrapped track/keyframe edits. |
+| [Theme / UI](#theme-and-ui-category-preview) | editor | Theme resources, `Control` hierarchies, layout presets. |
+| [Particle](#particle-category) | editor | GPU and CPU particle setup and preview. |
+| [Audio](#audio-category) | editor, runtime | Bus configuration plus runtime stream playback. |
+| [Blend Tree](#blend-tree-category) | editor | `AnimationNodeBlendTree` graph node configuration. |
+| [Export](#export-category) | cli | `export_presets.cfg` inspection and headless exports. |
+| [Visualizer](#visualizer-category) | editor | Browser visualizer lifecycle and snapshot endpoints. |
+| [Asset Generation](#asset-generation-category) | editor | SVG rasterisation, atlas packing, noise textures, icon sets. |
+| [Self-Healing](#self-healing-category) | editor | Inspect failing `.tres` files, suggest actions, bounded retry loop. |
+| [Animation (Phase 6A)](#animation-phase-6a) | editor | Phase 6A parity tool sequence for `AnimationPlayer`. |
+| [TileMap (Phase 6A)](#tilemap-phase-6a) | editor | TileMap cell and region edits, JSON import/export. |
+| [Theme / UI (Phase 6A)](#theme--ui-phase-6a) | editor | Phase 6A theme / UI adapter surface. |
+| [Shader (Phase 6A)](#shader-phase-6a) | editor | Shader creation, validation, uniform inspection. |
+| [Physics (Phase 6A)](#physics-phase-6a) | editor, runtime | Collision-layer configuration plus runtime spatial queries. |
+| [3D Scene (Phase 6A)](#3d-scene-phase-6a) | editor | MeshInstance, lights, camera, environment, glTF import, lightmap baking. |
+| [Particle (Phase 6A)](#particle-phase-6a) | editor | Phase 6A particle adapter surface. |
+| [Navigation (Phase 6A)](#navigation-phase-6a) | editor, runtime | NavMesh baking, agent setup, runtime pathfinding and debug draw. |
+| [Audio (Phase 6A)](#audio-phase-6a) | editor, runtime | Phase 6A audio adapter surface. |
+| [AnimationTree (Phase 6A)](#animationtree-phase-6a) | editor | AnimationTree lifecycle and parameter introspection. |
+| [State Machine (Phase 6A)](#state-machine-phase-6a) | editor, runtime | `AnimationNodeStateMachinePlayback` control. |
+| [Blend Tree (Phase 6A)](#blend-tree-phase-6a) | editor | Phase 6A blend-tree node configuration. |
+| [Export (Phase 6A — CLI channel)](#export-phase-6a--cli-channel) | cli | Phase 6A export-preset tools (list, validate, run). |
+| [Android Deploy (Phase 6A — CLI channel)](#android-deploy-phase-6a--cli-channel) | cli | `adb` device enumeration, APK install, logcat window. |
+| [Observability](#observability) | server | Structured logs, trace/span ids, canonical metric registry. |
+| [Health endpoint](#health-endpoint) | server | `/health`, `/metrics`, `/version`, `/trace/:trace_id` HTTP endpoints. |
+
+Additional RPG-domain categories (`combat`, `crafting`, `inventory`,
+`stats`, `effects`, `magic`, `equipment`, `progression`, `enemies`,
+`loot`, `spawner`, `chests`, `npc`, `dialog`, `vendor`) are documented
+alongside the `forgekit_rpg` module in the paid-module repository; the
+`modules.activate_license` call unlocks the full set behind a single
+`license_id`.
+
+## Known error codes
+
+Every ForgeKit-specific error code uses the negative JSON-RPC server
+error range (`-32000` to `-32099`). The table below consolidates the
+codes referenced throughout this document; per-tool sections repeat
+the relevant entry with the exact `data` payload.
+
+| Code     | Symbol                                   | Channel(s)    | Meaning |
+| -------- | ---------------------------------------- | ------------- | ------- |
+| `-32004` | `NON_UNDOABLE_OPERATION`                 | editor        | Advisory warning on a successful result when the mutation happens outside `EditorUndoRedoManager`. |
+| `-32005` | `PACKET_TOO_LARGE`                       | runtime       | UDP datagram above the 65 507-byte limit. `data` carries `{size, limit, suggestion}`. |
+| `-32005` | `MODULE_NOT_FOUND`                       | editor, cli   | A `modules.*` call referenced a `module_id` not installed under `<projectRoot>/addons/`. Shares the numeric code with `PACKET_TOO_LARGE`; disambiguated by channel and by `message`. |
+| `-32006` | `license_verification_failed`            | editor, cli   | `modules.activate_license` rejected the supplied signature. `data` carries `{module_id}`. |
+| `-32007` | `ACTIVATION_FAILED`                      | editor, cli   | `modules.activate_license` failed for a non-canonical reason (file I/O, HMAC-context error). `data` carries `{module_id, original_error}`. |
+| `-32008` | `CORE_VERSION_UNAVAILABLE`               | editor, cli   | `modules.check_compatibility` could not resolve the installed Core version from the repository git tag. `data.reason` is `"git_describe_failed"` or `"git_describe_empty"`. |
+| `-32009` | `TRANSACTION_NOT_OPEN`                   | editor        | `transaction.commit` / `transaction.rollback` was called with a `transaction_id` that is not currently open. |
+| `-32011` | `MANIFEST_TAG_NOT_FOUND`                 | cli (release) | `manifest.core_min_version` points at a Git tag that does not exist in Core. `data` carries `{tag}`. |
+| `-32012` | `CONTEXT_FILE_STALE`                     | cli (hooks)   | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. Raised by the `pre-commit` hook. |
+| `-32013` | `CONVENTIONAL_COMMITS_FORMAT_VIOLATION`  | cli (hooks)   | Commit message does not match the Conventional Commits grammar. Raised by the `commit-msg` hook. |
+| `-32014` | `PR_TEMPLATE_INCOMPLETE`                 | cli (CI)      | Pull request description is missing one of the four required sections. |
 
 ## Transports
 

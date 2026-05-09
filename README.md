@@ -18,6 +18,30 @@ running game through a stable tool surface.
   `@forgekit/core-mcp` package).
 - `npm` 10 or newer (ships with Node.js 20).
 
+## Compared to
+
+ForgeKit Core is one of several MCP servers targeting the Godot
+editor. The table below lists factual differences against the
+communities' most active alternatives at the time of writing. Rows
+mark "no" when the upstream project does not advertise the capability
+in its README; see each project's documentation for the latest state.
+
+| Capability              | ForgeKit Core             | [godot-mcp-pro](https://github.com/sparklecom/godot-mcp-pro) | [tomyud1/godot-mcp](https://github.com/tomyud1/godot-mcp) | [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp) |
+| ----------------------- | ------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
+| Tool count              | ~215 (Full profile)       | ~150                                                       | ~120                                                      | ~90                                                               |
+| Editor channel          | yes (WebSocket, 6010-6019) | yes                                                        | yes                                                       | no                                                                |
+| Runtime channel         | yes (UDP, 6020-6029)      | no                                                         | no                                                        | no                                                                |
+| CLI channel             | yes (spawn `godot --headless`) | yes                                                    | yes                                                       | yes                                                               |
+| UndoRedo integration    | yes (every editor mutation) | partial                                                  | no                                                        | no                                                                |
+| Self-healing loop       | yes (`.tres` inspect + suggest + bounded retry) | no                                         | no                                                        | no                                                                |
+| Modules / licensing     | yes (paid `forgekit_rpg` + HMAC license store) | no                                          | no                                                        | no                                                                |
+| Observability           | structured JSONL logs + trace/span ids + Prometheus metrics + health endpoint | no | no                                                        | no                                                                |
+
+The comparison is about architectural scope only — every project
+listed above ships the fundamentals agents need for editor automation
+and is worth evaluating alongside ForgeKit Core based on the team's
+day-to-day workflow.
+
 ## Quickstart
 
 This quickstart takes you from zero to the first `crafting.execute` call in

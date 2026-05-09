@@ -348,6 +348,159 @@ The static page fetches its data from three JSON endpoints:
   a minimal placeholder page and a `VISUALIZER_INDEX_MISSING` warning
   is logged.
 
+## System overview
+
+The diagram below shows the end-to-end architecture that has landed
+across Phases 0–6: the three MCP channels, the cross-cutting Event
+Bus, the Phase 5 authoring subsystems (browser visualizer, asset
+generator, self-healing loop), and the Phase 6 observability layer
+(structured JSONL logs, metrics, health endpoint).
+
+```mermaid
+graph LR
+    Agent[AI Agent<br/>LLM client]
+    CLI[CLI<br/>forgekit-mcp --stdio]
+    Server[MCP Server<br/>&#64;forgekit/core-mcp]
+    Editor[Editor Plugin<br/>WebSocket 6010-6019]
+    Visualizer[Browser Visualizer<br/>HTTP 6030-6039]
+    AssetGen[Asset Generator<br/>editor adapter]
+    Healing[Self-Healing Loop<br/>editor adapter]
+    Runtime[Runtime Bridge<br/>UDP 6020-6029]
+    Health[Health endpoint<br/>HTTP 6040-6049]
+    GodotEditor[Godot editor]
+    GodotGame[Godot game process]
+    EventBus[GameEvents autoload<br/>event bus]
+    Logs[JSONL logs<br/>$HOME/.forgekit/logs/<br/>user://mcp_logs/]
+
+    Agent <-->|stdio JSON-RPC 2.0| Server
+    CLI -->|spawn godot --headless| GodotEditor
+    Server <-->|WebSocket JSON-RPC 2.0| Editor
+    Server <-->|UDP JSON-RPC| Runtime
+    Server -->|spawn godot --headless| GodotEditor
+    Server -->|HTTP GET| Health
+
+    Editor --> GodotEditor
+    Editor --> Visualizer
+    Editor --> AssetGen
+    Editor --> Healing
+    Runtime --> GodotGame
+
+    GodotEditor --> EventBus
+    GodotGame --> EventBus
+
+    Server --> Logs
+    Editor --> Logs
+    Runtime --> Logs
+```
+
+The Event Bus (`GameEvents` autoload) is cross-cutting: every
+subsystem that needs to react to gameplay or authoring events wires
+itself to a declared signal rather than reaching into another
+subsystem's internals. The JSONL logs in `$HOME/.forgekit/logs/`
+(server side) and `user://mcp_logs/<component>/` (Godot side) share
+one line shape so a single `trace_id` can be grepped across all
+three channels.
+
+## Module layout
+
+The repository splits ForgeKit into two addons on the Godot side and
+one Node.js package on the server side:
+
+### `addons/forgekit_core/`
+
+- `event_bus/` — `GameEvents` autoload with the declared signal
+  schema.
+- `resources/` — base resource classes (`ItemResource`,
+  `RecipeResource`, `EquipableItemResource`).
+- `manifest/` — module manifest loader backing `project.list_modules`.
+- `mcp/editor_plugin/` — editor plugin entry point, WebSocket
+  server, JSON-RPC dispatcher, UndoRedo wrapper, project-settings
+  atomic writer, visualizer HTTP server, asset-generator tools,
+  self-healing tools, and the twelve Phase 6A adapter families
+  (animation, tilemap, theme/ui, shader, physics, scene3d, particle,
+  navigation, audio, animation_tree, state_machine, blend_tree).
+- `mcp/runtime_bridge/` — `McpBridge` autoload, UDP server, runtime
+  adapter families for the MVP tools plus Phase 6A runtime categories
+  (physics, navigation, audio, state_machine).
+- `mcp/licensing/` — HMAC-SHA256 license store, license activator,
+  and the canonical `license_id` → tool-category mapping.
+- `mcp/observability/` — `McpJsonlLogger`, trace-id plumbing, and
+  the metrics-sink hook wired through the dispatcher.
+- `testing/` — `TestReport` shape, CoreFuzz fuzzer.
+- `tools/` — headless CLI adapters used by the CI runner.
+
+### `addons/forgekit_rpg/` (paid, optional)
+
+Shipped separately from `ForgeKitStudio/forgekit-rpg`. The consumer
+drops the signed ZIP into this directory; ForgeKit Core detects the
+manifest at startup and exposes the additional tool categories once
+`modules.activate_license` verifies the HMAC signature.
+
+### `mcp-server/src/`
+
+- `index.ts` — CLI entry point, stdio bridge, profile selection.
+- `stdio_bridge.ts` — stdio transport for MCP clients.
+- `port_scanner.ts` — scans the 6010-6019 / 6020-6029 / 6030-6039 /
+  6040-6049 ranges for free ports.
+- `auto_reconnect.ts`, `auth_verifier.ts`, `bind_warning.ts` —
+  cross-cutting behaviours shared by every channel.
+- `health_endpoint.ts` — `/health`, `/metrics`, `/version`,
+  `/trace/:trace_id` HTTP server.
+- `metrics.ts` — metrics registry and canonical counter / histogram
+  names.
+- `observability/` — JSONL logger, trace-id generator, and the
+  server-side metrics registry.
+- `tools/` — per-category server-side adapters. Editor-channel tools
+  mostly forward to the Godot-side adapters above; CLI-channel
+  categories (`export/`, `android/`, `project/`, `testing/`) and a
+  few `modules/` tools implement the logic directly.
+- `healing/` — server-side `suggest_action` + `resource_inspect`
+  implementations shared with the editor adapters.
+- `licensing/` — license-directory scanner that translates installed
+  `<module_id>.key` files into unlocked tool categories.
+- `verify_manifest_tag.ts` — port of the `forgekit-rpg` release
+  pipeline helpers used by Property 34.
+
+## End-to-end: crafting test + healing fix
+
+The sequence diagram below shows the full Phase 5 self-healing loop
+driven by an AI agent. The agent runs a crafting gameplay test,
+observes a failure report, inspects the offending `.tres`, and
+applies a suggested fix — all through the MCP server.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as AI Agent
+    participant Server as MCP Server
+    participant Editor as Editor Plugin
+    participant CLI as godot --headless
+    participant Runtime as Runtime Bridge
+    participant Heal as Self-Healing
+
+    Agent->>Server: tests.run_gameplay<br/>scene=crafting.tscn<br/>steps=[add:iron_ore:2, craft:iron_ingot]
+    Server->>CLI: spawn --mcp-bridge<br/>--mcp-bridge-steps=...
+    CLI->>Runtime: open UDP 6020-6029
+    Runtime-->>CLI: inventory.add_item / crafting.execute
+    CLI-->>Server: TestReport JSON<br/>(failed=1, suggested_action=inspect_tres)
+    Server-->>Agent: TestReport
+    Agent->>Server: healing.inspect_failure<br/>report=<TestReport>
+    Server->>Heal: analyse failing case
+    Heal-->>Server: suggested_fix { path, patch }
+    Server-->>Agent: { suggested_fix }
+    Agent->>Server: healing.apply_and_retest<br/>fix=<suggested_fix>
+    Server->>Editor: resource.apply_fix<br/>(UndoRedo-wrapped)
+    Editor-->>Server: ok
+    Server->>CLI: re-run tests.run_gameplay
+    CLI-->>Server: TestReport (passed=1, failed=0)
+    Server-->>Agent: { retries=1, status=ok }
+```
+
+If the retry counter reaches the hard limit of three without a clean
+`TestReport`, the self-healing loop escalates to `manual_review`
+instead of looping forever — the `healing.suggest_action` property
+test exercises that upper bound directly.
+
 ## Module consolidation — why `forgekit_rpg` is one module
 
 The paid layer ships as a single module (`addons/forgekit_rpg/`) that
