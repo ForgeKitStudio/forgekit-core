@@ -1,7 +1,7 @@
 # MCP API
 
 This document describes the tool surface exposed by
-`@forgekit/core-mcp`. The v0.1 MVP shapes below are stable from that
+`@forgekitstudio/core-mcp`. The v0.1 MVP shapes below are stable from that
 milestone onward; Phase 6A adds fourteen editor/CLI-channel tool
 categories that bring the full surface to 215 tools across 34
 categories, tracked in the design document.
@@ -73,6 +73,14 @@ the relevant entry with the exact `data` payload.
 | `-32012` | `CONTEXT_FILE_STALE`                     | cli (hooks)   | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. Raised by the `pre-commit` hook. |
 | `-32013` | `CONVENTIONAL_COMMITS_FORMAT_VIOLATION`  | cli (hooks)   | Commit message does not match the Conventional Commits grammar. Raised by the `commit-msg` hook. |
 | `-32014` | `PR_TEMPLATE_INCOMPLETE`                 | cli (CI)      | Pull request description is missing one of the four required sections. |
+| `-32015` | `WORKSPACE_NOT_FOUND`                    | editor, runtime, cli | `workspace_id` is not registered. `data` carries `{workspace_id}`. |
+| `-32016` | `WORKSPACE_ALREADY_REGISTERED`           | editor, cli   | `project.add` was called with a `workspace_id` already mapped to a different record. `data` carries `{workspace_id, existing_workspace}`. |
+| `-32017` | `PROJECT_ROOT_ALREADY_REGISTERED`        | editor, cli   | `project.add` was called with a `projectRoot` already owned by another workspace. `data` carries `{projectRoot, existing_workspace_id}`. |
+| `-32018` | `INVALID_PROJECT_ROOT`                   | editor, cli   | `projectRoot` failed path validation. `data` carries `{projectRoot, reason}` where `reason ∈ {"not_absolute", "not_a_directory", "missing_project_godot"}`. |
+| `-32019` | `WORKSPACE_LIMIT_EXCEEDED`               | editor, cli   | Attempted to register beyond the `MAX_WORKSPACES = 32` limit. `data` carries `{limit, current}`. |
+| `-32020` | `PORT_RANGE_EXHAUSTED`                   | editor, runtime | Every port in the range is occupied (between kernel-level binds and ports already taken by sibling workspaces). `data` carries `{channel, range_start, range_end, in_use}`. |
+| `-32021` | `NO_ACTIVE_WORKSPACE`                    | editor, runtime, cli | A tool call without `workspace_id` reached the dispatcher while the registry is empty. `data` is `{}`. |
+| `-32022` | `WORKSPACE_ROOT_MISMATCH`                | editor, runtime, cli | Explicit `projectRoot` does not match the resolved workspace's registered root. `data` carries `{workspace_id, registered_project_root, requested_project_root}`. |
 
 ## Transports
 
@@ -348,12 +356,148 @@ Enumerates every directory under `addons/` that ships a `plugin.cfg`.
 in `project.godot`. Directories without a `plugin.cfg` are skipped, matching
 Godot's own "Plugins" editor list.
 
+## Project management (multi-project)
+
+The MCP server owns a per-process `ProjectRegistry` so a single server
+instance can serve multiple Godot projects (workspaces) at once.
+Workspace state is mirrored to `$HOME/.forgekit/workspaces.json` via
+atomic temp-file + rename, so restarting the server restores the exact
+same set of workspaces without a rescan.
+
+Every mutating tool call accepts an optional `workspace_id` parameter.
+When omitted, the dispatcher uses the currently active workspace; when
+the registry is empty the dispatcher returns `NO_ACTIVE_WORKSPACE`
+(`-32021`). Explicit `projectRoot` continues to work for pre-v0.9.0
+clients, but if both are supplied and they diverge the dispatcher
+returns `WORKSPACE_ROOT_MISMATCH` (`-32022`).
+
+All five tools below are `scope: core, channel: editor,
+module: core-minimal` — available in every profile including
+`Minimal`.
+
+### `project.list_workspaces` — `editor`, `cli`
+
+Read-only enumeration of the registry.
+
+**Params:** `{}`
+
+**Result:**
+
+```json
+{
+  "workspaces": [
+    {
+      "workspace_id": "client-a",
+      "projectRoot": "/Users/dev/projects/client-a",
+      "label": "Client A — RPG game",
+      "registered_at": "2026-05-09T19:30:00.000Z",
+      "active": true
+    }
+  ],
+  "active_workspace_id": "client-a",
+  "limit": 32
+}
+```
+
+`workspaces` is sorted ascending by `workspace_id`. `limit` is the
+hard `MAX_WORKSPACES` ceiling enforced at registration.
+
+### `project.add` — `editor`, `cli`
+
+Register a new workspace. Idempotent: re-adding the same
+`(workspace_id, projectRoot, label)` triple returns the existing record
+unchanged. Mismatched fields raise `WORKSPACE_ALREADY_REGISTERED`
+(`-32016`). Duplicate `projectRoot` under a different `workspace_id`
+raises `PROJECT_ROOT_ALREADY_REGISTERED` (`-32017`). `projectRoot`
+must be an absolute path pointing at an existing directory that
+contains `project.godot`; failures raise `INVALID_PROJECT_ROOT`
+(`-32018`). Exceeding the `MAX_WORKSPACES = 32` ceiling raises
+`WORKSPACE_LIMIT_EXCEEDED` (`-32019`).
+
+**Params:** `{ "workspace_id": "<id>", "projectRoot": "<absolute path>", "label": "<optional>", "make_active": false }`
+
+**Result:**
+
+```json
+{
+  "workspace": {
+    "workspace_id": "client-a",
+    "projectRoot": "/Users/dev/projects/client-a",
+    "label": "Client A — RPG game",
+    "registered_at": "2026-05-09T19:30:00.000Z",
+    "active": true
+  }
+}
+```
+
+When `make_active=true`, the server also calls `setActive` so the new
+workspace becomes the default target for tool calls without
+`workspace_id`.
+
+### `project.switch` — `editor`, `cli`
+
+Change the active workspace. Idempotent on self-switch. Unknown
+`workspace_id` raises `WORKSPACE_NOT_FOUND` (`-32015`).
+
+**Params:** `{ "workspace_id": "<id>" }`
+
+**Result:**
+
+```json
+{ "previous_workspace_id": "default", "active_workspace_id": "client-a" }
+```
+
+### `project.remove` — `editor`, `cli`
+
+Unregister a workspace. No-op for unknown ids (returns `{removed:
+null}`). When the removed workspace was the active one, the server
+auto-promotes the most recently registered remaining workspace;
+`active_workspace_id` is `null` when the registry becomes empty.
+
+**Params:** `{ "workspace_id": "<id>" }`
+
+**Result:**
+
+```json
+{
+  "removed": {
+    "workspace_id": "client-a",
+    "projectRoot": "/Users/dev/projects/client-a",
+    "registered_at": "2026-05-09T19:30:00.000Z",
+    "active": false
+  },
+  "active_workspace_id": "internal-demo"
+}
+```
+
+### `project.get_active` — `editor`, `cli`
+
+Return the currently active workspace.
+
+**Params:** `{}`
+
+**Result:**
+
+```json
+{
+  "active_workspace_id": "client-a",
+  "workspace": {
+    "workspace_id": "client-a",
+    "projectRoot": "/Users/dev/projects/client-a",
+    "registered_at": "2026-05-09T19:30:00.000Z",
+    "active": true
+  }
+}
+```
+
+Both fields are `null` when the registry is empty.
+
 ## Testing/QA category
 
 All testing tools return a `TestReport` — the canonical JSON shape
 emitted by GUT, property, and gameplay runs — defined in
 `addons/forgekit_core/testing/test_report.gd` and mirrored on the server
-in `@forgekit/core-mcp`.
+in `@forgekitstudio/core-mcp`.
 
 ### `TestReport` shape
 
@@ -1989,6 +2133,36 @@ calls return the existing instance).
 Histograms keep a rolling window of the most recent 1000 observations
 and report `{count, sum, p50, p95, p99}` via `snapshot()`, using the
 nearest-rank percentile rule (`index = ceil(p * n) - 1`).
+
+### Workspace routing (multi-project)
+
+Every JSON-RPC request carries an implicit or explicit workspace
+context. The dispatcher's `resolveWorkspace` middleware translates
+`(params.workspace_id, params.projectRoot)` into a single
+`(Workspace, projectRoot)` tuple before forwarding to the tool
+handler. The resolved `workspace_id` is set as a reserved JSONL
+logger field (`mcp-server/src/observability/jsonl_logger.ts` and
+`addons/forgekit_core/mcp/observability/jsonl_logger.gd`), so every
+emitted log line carries `workspace_id` at top level alongside
+`trace_id` / `span_id` / `method` / `duration_ms`.
+
+Tip: grep the JSONL logs with `workspace_id=<id>` to get the full
+audit trail for a single workspace across the editor / runtime / CLI
+channels.
+
+The `/health` endpoint also exposes the workspace summary:
+
+```json
+{
+  "status": "ok",
+  "checks": {"editor": "ok", "runtime": "ok", "cli": "ok"},
+  "workspaces": {"count": 2, "active": "client-a"}
+}
+```
+
+The `workspaces` field is only present when the server was started
+with a ProjectRegistry dependency; pre-v0.9.0 health responses (no
+registry wired) continue to emit the two-field shape.
 
 ## Health endpoint
 
