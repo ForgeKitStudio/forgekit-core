@@ -197,7 +197,7 @@ Returns a stable summary of a project.
 ```json
 {
   "name": "ForgeKit Core Template",
-  "godot_version": "4.3",
+  "godot_version": "4.6",
   "api_version": "0.1.0",
   "modules_count": 0,
   "root_path": "/abs/path/to/project"
@@ -205,7 +205,7 @@ Returns a stable summary of a project.
 ```
 
 `godot_version` is extracted from
-`[application] config/features=PackedStringArray("4.3", "Forward Plus")`.
+`[application] config/features=PackedStringArray("4.6", "Forward Plus")`.
 When no `X.Y[.Z]` literal is present the value is `"unknown"` rather
 than a guess. `modules_count` is the number of `addons/forgekit_*/`
 directories that ship a valid `module.manifest.tres`.
@@ -267,6 +267,12 @@ An empty `violations` array means the project is clean. Each violation
 aggregates every offending target from a single file, deduplicated in
 first-seen order, so callers act on files rather than individual lines.
 
+`addons/forgekit_rpg/public_api.gd` is the designated cross-subsystem
+aggregator and is exempt from the cross-subsystem rule: it may `preload`
+or `load` any file under `addons/forgekit_rpg/<subsystem>/`. It is still
+bound by the module boundary rule and must not import from any other
+`forgekit_*` addon.
+
 ### `project.get_settings` — `editor`
 
 Reads `project.godot` from disk on every call (not from the editor's
@@ -284,7 +290,7 @@ on-disk state.
 `section`, only keys inside that section are returned with the section
 prefix stripped. Unknown sections resolve to `{ "settings": {} }`. Values
 are returned verbatim — literal strings such as
-`PackedStringArray("4.3", "Forward Plus")` are not coerced.
+`PackedStringArray("4.6", "Forward Plus")` are not coerced.
 
 ### `project.update_settings` — `editor`
 

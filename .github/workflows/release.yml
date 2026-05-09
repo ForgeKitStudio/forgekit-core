@@ -48,10 +48,10 @@ jobs:
       tag_name: ${{ steps.resolve.outputs.tag_name }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: "npm"
@@ -107,14 +107,14 @@ jobs:
       TAG_NAME: ${{ needs.validate-tag.outputs.tag_name }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # conventional-changelog-cli needs the full history to compute
           # the release notes window.
           fetch-depth: 0
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: "npm"
@@ -149,7 +149,7 @@ jobs:
           zip -r "forgekit-core-${TAG_VERSION}.zip" addons/forgekit_core
 
       - name: Upload artifacts (always)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: forgekit-core-${{ env.TAG_VERSION }}
           path: |
@@ -160,7 +160,7 @@ jobs:
 
       - name: Publish GitHub Release
         if: github.event_name == 'push' || github.event.inputs.dry_run == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: ${{ env.TAG_NAME }}
