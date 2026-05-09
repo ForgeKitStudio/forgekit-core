@@ -6,7 +6,7 @@
  *     Malformed files are skipped with a warning and never throw. Missing
  *     directories yield an empty map.
  *   - `unlockedModulesFromLicenses(records)` maps a presence of the
- *     `forgekit_rpg` record to the four RPG subsystem modules.
+ *     `forgekit_rpg` record to the seven RPG subsystem modules.
  *   - `resolveLicenseDir({projectRoot})` reads `<projectRoot>/project.godot`,
  *     extracts `config/name`, and composes the per-platform path. When the
  *     file is missing, the resolver falls back to the project root's
@@ -127,7 +127,7 @@ describe('unlockedModulesFromLicenses', () => {
     expect([...set].sort()).toEqual([]);
   });
 
-  it('unlocks the four RPG subsystems when a forgekit_rpg record is present', () => {
+  it('unlocks the seven RPG subsystems when a forgekit_rpg record is present', () => {
     const set = unlockedModulesFromLicenses({
       forgekit_rpg: {
         license_id: 'forgekit_rpg',
@@ -135,7 +135,15 @@ describe('unlockedModulesFromLicenses', () => {
         fingerprint: 'a'.repeat(64),
       },
     });
-    expect([...set].sort()).toEqual(['combat', 'crafting', 'inventory', 'stats']);
+    expect([...set].sort()).toEqual([
+      'combat',
+      'crafting',
+      'effects',
+      'equipment',
+      'inventory',
+      'magic',
+      'stats',
+    ]);
   });
 
   it('ignores unknown module ids', () => {

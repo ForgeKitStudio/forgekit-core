@@ -260,7 +260,7 @@ describe('applyProfile with unlockedModules option', () => {
     expect(unique.size).toBe(list.length);
   });
 
-  it('licenseId === "forgekit_rpg" still unlocks all four RPG subsystems when unlockedModules is not provided', () => {
+  it('licenseId === "forgekit_rpg" still unlocks every RPG subsystem when unlockedModules is not provided', () => {
     const legacy = names(applyProfile(FIXTURE, 'RPG-only', { licenseId: 'forgekit_rpg' }));
     expect(legacy).toContain('combat.list_hitboxes');
     expect(legacy).toContain('crafting.execute');
