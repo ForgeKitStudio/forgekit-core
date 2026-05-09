@@ -46,9 +46,28 @@ is the single cross-system signal hub. Subscribers connect with
 type-checks the payload against a declared schema and surfaces mismatches
 through `push_error` instead of letting them propagate silently.
 
-Declaring a new global signal is a Core change: it must be added to
+Declaring a new global signal is a Core change (v0.5.0: nine signals declared, see reference below): it must be added to
 `game_events.gd` together with an entry in the internal `_SIGNAL_SCHEMAS`
 dictionary. Client code may not redeclare or shadow these signals.
+
+As of v0.5.0 the bus declares nine signals in total; see the full reference below.
+
+### Declared signals (9 total as of v0.5.0)
+
+Phase 0–3:
+
+- `damage_dealt(source: Node, target: Node, damage: float, damage_type: StringName)` — combat hit resolves against a valid target.
+- `crafting_completed(recipe_id: StringName, outputs: Array)` — a crafting operation finishes successfully.
+- `item_added(item_id: StringName, amount: int)` — an item enters an inventory.
+- `item_removed(item_id: StringName, amount: int)` — an item leaves an inventory.
+
+Phase 4B additions (consumed by the RPG module's effects / magic / equipment subsystems):
+
+- `status_effect_ticked(owner: StringName, effect_id: StringName, tick_index: int)` — a registered StatusEffect completes a tick (for example poison dealing damage).
+- `status_effect_expired(owner: StringName, effect_id: StringName)` — a StatusEffect's remaining_duration reached zero and the effect was auto-removed.
+- `spell_cast(caster: StringName, spell_id: StringName, target: Node, status: StringName)` — a spell cast completes; the `status` is the `CastResult.Status` name (`ok`, `insufficient_mana`, `on_cooldown`, ...).
+- `item_equipped(owner: StringName, slot: StringName, item_id: StringName)` — an `EquipableItemResource` is successfully slotted.
+- `item_unequipped(owner: StringName, slot: StringName, item_id: StringName)` — an item is removed from a slot.
 
 ## Resources
 

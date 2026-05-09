@@ -7,7 +7,12 @@ const EXPECTED_SIGNALS: Array = [
 	"crafting_completed",
 	"damage_dealt",
 	"item_added",
+	"item_equipped",
 	"item_removed",
+	"item_unequipped",
+	"spell_cast",
+	"status_effect_expired",
+	"status_effect_ticked",
 ]
 
 
@@ -41,13 +46,18 @@ func after_each() -> void:
 			var callable: Callable = connection["callable"]
 			if callable.get_object() == self:
 				_bus().disconnect(signal_name, callable)
+	_received_status_effect_ticked.clear()
+	_received_status_effect_expired.clear()
+	_received_spell_cast.clear()
+	_received_item_equipped.clear()
+	_received_item_unequipped.clear()
 
 
 func test_list_signals_returns_all_declared_signal_names() -> void:
 	var result: Variant = _bus().call("list_signals")
 	assert_true(result is Array, "list_signals must return an Array")
 	var names: Array = result
-	assert_eq(names.size(), 4, "Expected exactly four declared global signals")
+	assert_eq(names.size(), 9, "Expected exactly nine declared global signals after phase 4B additions")
 	for expected in EXPECTED_SIGNALS:
 		assert_true(names.has(expected), "Expected signal '%s' to be declared" % expected)
 
@@ -161,3 +171,128 @@ func test_emit_validated_rejects_unknown_signal() -> void:
 			"push_error must mention the offending signal name"
 		)
 		err.handled = true
+
+
+# ---------------------------------------------------------------------------
+# Phase 4B additions — status effects, spell casts, equipment events
+# ---------------------------------------------------------------------------
+
+var _received_status_effect_ticked: Array = []
+var _received_status_effect_expired: Array = []
+var _received_spell_cast: Array = []
+var _received_item_equipped: Array = []
+var _received_item_unequipped: Array = []
+
+
+func _on_status_effect_ticked(owner: StringName, effect_id: StringName, tick_index: int) -> void:
+	_received_status_effect_ticked.append([owner, effect_id, tick_index])
+
+
+func _on_status_effect_expired(owner: StringName, effect_id: StringName) -> void:
+	_received_status_effect_expired.append([owner, effect_id])
+
+
+func _on_spell_cast(caster: StringName, spell_id: StringName, target: Node, status: StringName) -> void:
+	_received_spell_cast.append([caster, spell_id, target, status])
+
+
+func _on_item_equipped(owner: StringName, slot: StringName, item_id: StringName) -> void:
+	_received_item_equipped.append([owner, slot, item_id])
+
+
+func _on_item_unequipped(owner: StringName, slot: StringName, item_id: StringName) -> void:
+	_received_item_unequipped.append([owner, slot, item_id])
+
+
+func test_status_effect_ticked_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("status_effect_ticked"))
+
+	_bus().connect(&"status_effect_ticked", Callable(self, "_on_status_effect_ticked"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"status_effect_ticked",
+		[StringName("hero"), StringName("mod_1"), 3]
+	)
+
+	assert_true(ok, "well-typed status_effect_ticked must propagate")
+	assert_eq(_received_status_effect_ticked.size(), 1)
+
+	_received_status_effect_ticked.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"status_effect_ticked",
+		[StringName("hero"), StringName("mod_1"), "three"]
+	)
+	assert_false(bad, "tick_index must be an int; String must be rejected")
+	assert_eq(_received_status_effect_ticked.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_status_effect_expired_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("status_effect_expired"))
+
+	_bus().connect(&"status_effect_expired", Callable(self, "_on_status_effect_expired"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"status_effect_expired",
+		[StringName("hero"), StringName("mod_1")]
+	)
+	assert_true(ok)
+	assert_eq(_received_status_effect_expired.size(), 1)
+
+
+func test_spell_cast_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("spell_cast"))
+
+	_bus().connect(&"spell_cast", Callable(self, "_on_spell_cast"))
+
+	var target: Node = Node.new()
+	add_child_autofree(target)
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"spell_cast",
+		[StringName("hero"), StringName("fireball"), target, StringName("ok")]
+	)
+	assert_true(ok, "well-typed spell_cast must propagate")
+	assert_eq(_received_spell_cast.size(), 1)
+
+	_received_spell_cast.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"spell_cast",
+		[StringName("hero"), StringName("fireball"), target, "ok"]  # status must be StringName
+	)
+	assert_false(bad, "spell_cast status must be StringName; plain String must be rejected")
+	assert_eq(_received_spell_cast.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_item_equipped_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("item_equipped"))
+
+	_bus().connect(&"item_equipped", Callable(self, "_on_item_equipped"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"item_equipped",
+		[StringName("hero"), StringName("weapon"), StringName("iron_sword")]
+	)
+	assert_true(ok)
+	assert_eq(_received_item_equipped.size(), 1)
+
+
+func test_item_unequipped_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("item_unequipped"))
+
+	_bus().connect(&"item_unequipped", Callable(self, "_on_item_unequipped"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"item_unequipped",
+		[StringName("hero"), StringName("weapon"), StringName("iron_sword")]
+	)
+	assert_true(ok)
+	assert_eq(_received_item_unequipped.size(), 1)
