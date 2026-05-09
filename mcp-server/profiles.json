@@ -631,6 +631,408 @@
       "scope": "core",
       "channel": "editor",
       "module": "core"
+    },
+    {
+      "name": "animation.list",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.play",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.stop",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.add_track",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.insert_keyframe",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.remove_track",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.set_cell",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.get_cell",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.fill_rect",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.clear_layer",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.import_from_json",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.export_to_json",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.set_default_font",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.set_color",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.set_stylebox",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "ui.build_control_tree",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "ui.apply_layout_preset",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.validate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.save_with_validation",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.set_uniform",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.list_uniforms",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.convert_visual_to_text",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.set_gravity",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.get_collision_layer_names",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.configure_layer",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.raycast",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "physics.shape_cast",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "physics.query_point",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.add_mesh_instance",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.add_light",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.add_camera",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.set_environment",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.bake_lightmap",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.import_gltf",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.create_gpu",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.create_cpu",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.set_emission_shape",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.preview_in_editor",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.convert_cpu_to_gpu",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.bake_mesh",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.add_agent",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.set_avoidance",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.configure_layers",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.find_path",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "navigation.debug_draw",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "audio.list_buses",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.set_bus_volume_db",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.add_bus_effect",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.import_sound",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.play_stream",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "audio.stop_stream",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.set_parameter",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.get_parameters",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.set_active",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "state_machine.list_states",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "state_machine.travel",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "state_machine.get_current",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "blend_tree.configure_node",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "export.list_presets",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "export.run_preset",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "export.validate_preset",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "android.list_devices",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "android.install_apk",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "android.run_logcat",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
     }
   ]
 }

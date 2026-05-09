@@ -143,6 +143,17 @@ Phase 5 adds three subtrees alongside the existing `tools/` directory:
 `plugin_lifecycle.gd` wires these adapters through optional Callable
 factories so headless tests can inject fakes.
 
+Phase 6A adds twelve editor-channel categories as adapter files under
+`tools/`: `animation_tools.gd`, `tilemap_tools.gd`, `theme_ui_tools.gd`,
+`shader_tools.gd`, `physics_tools.gd`, `scene3d_tools.gd`,
+`particle_tools.gd`, `navigation_tools.gd`, `audio_tools.gd`,
+`animation_tree_tools.gd`, `state_machine_tools.gd`,
+`blend_tree_tools.gd`. Mutating tools route through
+`McpUndoRedoWrapper`. Tools that touch `project.godot`
+(`physics.set_gravity`, `physics.configure_layer`,
+`navigation.configure_layers`) go through
+`McpProjectSettingsAtomicWriter`.
+
 ## MCP runtime bridge
 
 Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
@@ -150,6 +161,13 @@ Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
 registered in `project.godot` and exposes the runtime surface to the MCP
 server over a local transport. Like the editor plugin, this tree is
 read-only for agents and expands in later phases.
+
+Phase 6A adds four runtime-channel adapter files under
+`runtime_bridge/tools/`: `physics_runtime_tools.gd` (raycast, shape_cast,
+query_point), `navigation_runtime_tools.gd` (find_path, debug_draw),
+`audio_runtime_tools.gd` (play_stream, stop_stream), and
+`state_machine_runtime_tools.gd` (travel, get_current). These tools
+require the game to be launched with `--mcp-bridge`.
 
 ## MCP licensing
 
@@ -169,7 +187,7 @@ hook accepts the commit. Per-tool documentation and transport details live
 in `docs/mcp_api.md`.
 
 As of the `Unreleased` block in `CHANGELOG.md`, the `core`-scoped surface
-includes three new editor-channel categories added by Phase 5:
+includes three editor-channel categories added by Phase 5:
 
 - **Visualizer** — `visualizer.start`, `visualizer.stop`,
   `visualizer.render_scene_tree`, `visualizer.render_module_graph`,
@@ -182,6 +200,18 @@ includes three new editor-channel categories added by Phase 5:
   `healing.apply_and_retest`. Shares the `ALLOWED_SUGGESTED_ACTIONS`
   set (`inspect_tres`, `validate_gdscript`, `rerun_test`,
   `manual_review`) with `mcp-server/src/healing/suggest_action.ts`.
+
+Phase 6A adds two CLI-channel categories under `mcp-server/src/tools/`:
+
+- **Export** — `export.list_presets`, `export.run_preset`,
+  `export.validate_preset`. Spawns `godot --headless --export-*` via
+  the shared `SpawnGodot` helper.
+- **Android Deploy** — `android.list_devices`, `android.install_apk`,
+  `android.run_logcat`. Wraps `adb` via `src/tools/android/spawn_adb.ts`.
+
+Phase 6A also adds twelve editor-channel and four runtime-channel Godot
+tool categories (see the **MCP editor plugin** and **MCP runtime bridge**
+sections above).
 
 The `ToolModule` union in `mcp-server/src/profiles.ts` enumerates every
 module id recognized by the profile filter. As of v0.7.0 it covers

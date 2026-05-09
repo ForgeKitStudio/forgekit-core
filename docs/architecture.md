@@ -77,6 +77,18 @@ the right channel per tool.
   `node.set_property`, `resource.load`, `resource.save`,
   `resource.inspect`, `transaction.begin` / `commit` / `rollback`,
   `gdscript.save_with_validation`, `project.list_modules`.
+- **Tool-category adapters registered at startup.** On `_enter_tree`
+  the plugin's lifecycle helper (`McpEditorPluginLifecycle`) registers
+  each editor-channel tool family on the JSON-RPC dispatcher through a
+  dedicated adapter factory. Twelve adapter families cover the
+  authoring surface: `animation`, `tilemap`, `theme`/`ui`, `shader`,
+  `physics`, `scene3d`, `particle`, `navigation`, `audio`,
+  `animation_tree`, `state_machine`, and `blend_tree`. Each factory is
+  injectable, so headless tests drive the lifecycle against
+  in-memory fakes without opening real sockets. A lifecycle that only
+  wires the WebSocket server (no dispatcher, no adapter factories)
+  still starts and stops cleanly — the adapter registration is a pure
+  extension.
 
 ### 2. CLI headless — spawn `godot --headless`
 
@@ -89,7 +101,15 @@ the right channel per tool.
 - **Runs inside:** a short-lived Godot process with no graphical editor.
 - **Typical tools:** `tests.run_unit`, `tests.run_suite`,
   `tests.run_gameplay`, `tests.run_property`, `gdscript.validate`,
-  `project.check_imports`.
+  `project.check_imports`, `export.list_presets`, `export.run_preset`,
+  `export.validate_preset`, `android.list_devices`,
+  `android.install_apk`, `android.run_logcat`.
+- **Server-side-only categories.** Two CLI-channel families — `export`
+  and `android` — have no Godot-side adapter. They live entirely in
+  `mcp-server/src/tools/export/` and `mcp-server/src/tools/android/`,
+  shelling out to `godot --headless --export-release` / `--export-debug`
+  and to `adb` respectively. They read `export_presets.cfg` directly
+  from disk rather than going through the editor plugin.
 - **Why it exists:** CI, pre-commit validation, and property tests must
   run without an open editor session, and they must report results in a
   shape the self-healing loop can parse.
@@ -129,7 +149,19 @@ the right channel per tool.
   `scene.get_tree_snapshot`, `runtime.get_scene_tree`,
   `runtime.get_current_scene`, `runtime.change_scene`,
   `runtime.reload_current_scene`, `runtime.handshake`,
-  `runtime.heartbeat`.
+  `runtime.heartbeat`, `physics.raycast`, `physics.shape_cast`,
+  `physics.query_point`, `navigation.find_path`,
+  `navigation.debug_draw`, `audio.play_stream`, `audio.stop_stream`,
+  `state_machine.travel`, `state_machine.get_current`.
+- **Runtime-channel adapter families.** Alongside the MVP runtime
+  tools, the bridge registers four Phase 6A adapter families under
+  `addons/forgekit_core/mcp/runtime_bridge/tools/`: `physics` (three
+  spatial queries against `PhysicsDirectSpaceState`), `navigation`
+  (pathfinding and debug draw), `audio` (stream playback), and
+  `state_machine` (`AnimationNodeStateMachinePlayback` control). The
+  server-side profile filter exposes these tools without any
+  server-side code changes — they are pure Godot-side adapters
+  selected by `profiles.json`.
 
 ## Browser Visualizer — optional HTTP preview
 
