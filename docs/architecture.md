@@ -187,6 +187,50 @@ the right channel per tool.
   server-side code changes — they are pure Godot-side adapters
   selected by `profiles.json`.
 
+## Multi-project support
+
+A single MCP server process can serve multiple Godot projects at
+once. The server keeps a per-process `ProjectRegistry` that holds up
+to 32 workspaces (`MAX_WORKSPACES = 32`); each workspace is a tuple
+`{workspace_id, projectRoot, label?, registered_at, active}`. The
+registry is mirrored to `$HOME/.forgekit/workspaces.json` via an
+atomic temp-file + rename write, so restarting the server restores
+the full set of workspaces — including which one was active.
+
+**Registration.** `workspace_id` must match
+`^[a-z][a-z0-9_-]{0,63}$` (lowercase, kebab or snake case, 1–64
+characters, starting with a letter). `projectRoot` must be an
+absolute path to an existing directory containing `project.godot`;
+bad paths raise `INVALID_PROJECT_ROOT`. Duplicate ids raise
+`WORKSPACE_ALREADY_REGISTERED`; duplicate roots raise
+`PROJECT_ROOT_ALREADY_REGISTERED`. Exceeding the cap raises
+`WORKSPACE_LIMIT_EXCEEDED`. Only one workspace can be active at any
+time.
+
+**Per-workspace channel isolation.** Each active workspace gets its
+own pool of channel ports (`editor` `6010–6019`, `runtime`
+`6020–6029`, `visualizer` `6030–6039`, `health` `6040–6049`). The
+port scanner excludes ports already in use by sibling workspaces so
+two workspaces never collide on the same port; when every port in a
+range is taken the server returns `PORT_RANGE_EXHAUSTED`. Switching
+the active workspace does not drop existing WebSocket or UDP
+connections from other workspaces — it only changes which workspace
+the dispatcher uses when a caller omits `workspace_id`.
+
+**Default workspace and backwards compatibility.** On first start,
+the server auto-registers a `default` workspace using the current
+working directory (or the nearest ancestor containing
+`project.godot`). Pre-v0.9.0 clients that call tools with
+`projectRoot` only — no `workspace_id` — continue to work unchanged.
+A `--cwd <path>` CLI flag is a shortcut for registering that path as
+the `default` workspace with `make_active = true`. All existing
+error codes (`-32004` through `-32014`) keep their v0.8.x semantics;
+the new multi-project codes live in the `-32015` to `-32022` range.
+
+See `docs/mcp_api.md` for the five `project.*` tools
+(`list_workspaces`, `add`, `switch`, `remove`, `get_active`) and the
+full error-code payloads.
+
 ## Structured logging
 
 Both the MCP server (Node.js) and the Godot side write their own

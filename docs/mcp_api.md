@@ -362,7 +362,9 @@ The MCP server owns a per-process `ProjectRegistry` so a single server
 instance can serve multiple Godot projects (workspaces) at once.
 Workspace state is mirrored to `$HOME/.forgekit/workspaces.json` via
 atomic temp-file + rename, so restarting the server restores the exact
-same set of workspaces without a rescan.
+same set of workspaces without a rescan. The persistence file carries
+a `version: "1.0"` field so future migrations can be handled without
+breaking existing on-disk state.
 
 Every mutating tool call accepts an optional `workspace_id` parameter.
 When omitted, the dispatcher uses the currently active workspace; when
@@ -370,6 +372,30 @@ the registry is empty the dispatcher returns `NO_ACTIVE_WORKSPACE`
 (`-32021`). Explicit `projectRoot` continues to work for pre-v0.9.0
 clients, but if both are supplied and they diverge the dispatcher
 returns `WORKSPACE_ROOT_MISMATCH` (`-32022`).
+
+### Identifier and label rules
+
+- `workspace_id` must match `^[a-z][a-z0-9_-]{0,63}$` — lowercase ASCII,
+  kebab or snake case, 1–64 characters, starting with a letter.
+- `label` is optional, human-readable, and capped at 120 characters.
+- `projectRoot` must be an absolute path to an existing directory that
+  contains `project.godot` at the top level.
+
+### Default workspace and backwards compatibility
+
+On startup, if `$HOME/.forgekit/workspaces.json` does not exist, the
+server auto-registers a single `default` workspace using the current
+working directory (or the nearest ancestor containing
+`project.godot`); `label` defaults to the basename of that directory,
+and the workspace is marked active. When the working directory is not
+a Godot project, the registry starts empty and the first tool call
+without `workspace_id` returns `NO_ACTIVE_WORKSPACE`.
+
+A `--cwd <path>` flag on the server process is treated as a shortcut
+for `project.add({workspace_id: "default", projectRoot: <path>,
+make_active: true})`. Pre-v0.9.0 clients that pass only `projectRoot`
+continue to work unchanged — no new `workspace_id` parameter is
+required.
 
 All five tools below are `scope: core, channel: editor,
 module: core-minimal` — available in every profile including
