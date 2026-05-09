@@ -278,6 +278,15 @@ entry file requires updating the `..` count and the regression test in
 `test/cli_install_hooks.test.ts` (the test runs the compiled binary against
 a tmp git repo and asserts the shim points at an existing module).
 
+**Release-pipeline helper port**: `mcp-server/src/verify_manifest_tag.ts`
+mirrors the pure helpers from `forgekit-rpg/tools/verify-manifest-tag.js`
+(the release-pipeline `MANIFEST_TAG_NOT_FOUND` gate) so the Core property
+test `test/property_tag_compatibility.test.ts` can exercise
+`isValidCoreMinVersion` and `buildTagRefUrl` without a cross-repository
+import. Keep the two copies byte-for-byte aligned — the `forgekit-rpg`
+shell script is the canonical runtime and this file is the canonical
+test subject.
+
 ## Observability
 
 The MCP server exposes structured logs, a trace id that follows every
