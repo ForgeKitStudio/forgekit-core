@@ -62,6 +62,13 @@ and its `api_version` is bumped in the same release pull request.
 - `api_version: 0.0.0` — Phase 0 placeholder. Contents are skeletons only.
 - `api_version: 0.1.x` — Phase 1 ForgeKit Core MVP (Event Bus, base resources,
   initial MCP tool surface). Skills are populated with tool sequences.
+- `api_version: 0.7.x` — Phase 6B populated skill surface. Targets the
+  editor-plugin tools (`resource.inspect`, `resource.save`,
+  `project.list_modules`, `tests.run_unit`), runtime-channel diagnostics
+  (`runtime.is_connected`, `runtime.get_logs`), self-healing
+  (`healing.suggest_action`, `healing.inspect_failure`,
+  `healing.get_retry_count`, `healing.reset_retry_count`,
+  `resource.apply_fix`), and `modules.*` licensing.
 - Later versions follow semantic versioning. A breaking change in any MCP
   tool contract referenced by a skill requires a major version bump in both
   the MCP server and the affected skill.
@@ -80,5 +87,12 @@ phase; until then, copy the files manually.
 
 ## Status
 
-Phase 0: placeholders only. Full skill content is written in Phase 6 of the
-ForgeKit implementation plan (see `.kiro/specs/action-rpg-starter-kit/`).
+As of Phase 6B all four skill files are populated with full scenario
+content targeting `api_version: 0.7.x`:
+
+| File | Status |
+|------|--------|
+| `authoring_items.md` | Populated. |
+| `debugging_failing_tests.md` | Populated. |
+| `self_healing_tres.md` | Populated. |
+| `module_licensing.md` | Populated. |
