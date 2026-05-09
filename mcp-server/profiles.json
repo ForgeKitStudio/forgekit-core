@@ -313,6 +313,54 @@
       "scope": "module",
       "channel": "editor",
       "module": "equipment"
+    },
+    {
+      "name": "progression.grant_xp",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.get_state",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.allocate_stat_point",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.reset",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.list_curves",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.get_curve",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.list_rewards",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.get_reward",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
     }
   ]
 }

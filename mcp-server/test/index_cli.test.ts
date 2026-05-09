@@ -178,7 +178,7 @@ describe('CLI startup — license unlock logging', () => {
     }
   });
 
-  it('logs the seven RPG subsystem modules when a forgekit_rpg.key file is present', async () => {
+  it('logs the eight RPG subsystem modules when a forgekit_rpg.key file is present', async () => {
     requireBuilt();
     const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
@@ -204,6 +204,7 @@ describe('CLI startup — license unlock logging', () => {
       expect(stderr).toContain('effects');
       expect(stderr).toContain('magic');
       expect(stderr).toContain('equipment');
+      expect(stderr).toContain('progression');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
