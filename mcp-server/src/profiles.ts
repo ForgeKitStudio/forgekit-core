@@ -6,10 +6,10 @@
  *   - Lite     — tools with `scope === "core"` (both core-minimal and core).
  *   - Minimal  — tools with `module === "core-minimal"`.
  *   - RPG-only — core-minimal tools, plus every combat / crafting /
- *                inventory / stats / effects / magic / equipment tool
- *                after a valid `forgekit_rpg` license is presented.
- *                Without the license only the core-minimal set is
- *                returned.
+ *                inventory / stats / effects / magic / equipment /
+ *                progression tool after a valid `forgekit_rpg` license
+ *                is presented. Without the license only the core-minimal
+ *                set is returned.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -27,7 +27,8 @@ export type ToolModule =
   | 'stats'
   | 'effects'
   | 'magic'
-  | 'equipment';
+  | 'equipment'
+  | 'progression';
 
 export interface ToolEntry {
   readonly name: string;
@@ -46,9 +47,9 @@ export interface ApplyProfileOptions {
    * License identifier (legacy interface).
    *
    * When `licenseId === 'forgekit_rpg'` and `unlockedModules` is not
-   * supplied, the RPG-only profile unlocks all seven RPG subsystem
+   * supplied, the RPG-only profile unlocks all eight RPG subsystem
    * modules (combat, crafting, inventory, stats, effects, magic,
-   * equipment).
+   * equipment, progression).
    * When `licenseId` is any other non-null value and `unlockedModules`
    * is not supplied, `RpgLicenseRequiredError` is raised for the
    * RPG-only profile. Ignored by every other profile.
@@ -83,6 +84,7 @@ const VALID_MODULES: ReadonlyArray<ToolModule> = [
   'effects',
   'magic',
   'equipment',
+  'progression',
 ];
 
 const RPG_SUBSYSTEM_MODULES: ReadonlySet<ToolModule> = new Set([
@@ -93,6 +95,7 @@ const RPG_SUBSYSTEM_MODULES: ReadonlySet<ToolModule> = new Set([
   'effects',
   'magic',
   'equipment',
+  'progression',
 ]);
 
 const RPG_LICENSE_ID = 'forgekit_rpg';
@@ -228,9 +231,10 @@ export async function loadProfiles(path: string): Promise<ProfilesFile> {
  *
  * For backwards compatibility the legacy `options.licenseId` argument
  * is honoured when `unlockedModules` is not supplied: `licenseId ===
- * 'forgekit_rpg'` maps to the seven RPG subsystem modules (combat,
- * crafting, inventory, stats, effects, magic, equipment), any other
- * non-null id raises `RpgLicenseRequiredError` for the RPG-only profile.
+ * 'forgekit_rpg'` maps to the eight RPG subsystem modules (combat,
+ * crafting, inventory, stats, effects, magic, equipment, progression),
+ * any other non-null id raises `RpgLicenseRequiredError` for the
+ * RPG-only profile.
  */
 export function applyProfile(
   profiles: ProfilesFile,
