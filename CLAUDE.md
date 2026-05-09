@@ -152,6 +152,18 @@ read → parse → modify → write-temp → fsync → rename writes.
 The adapters are wired in through `plugin_lifecycle.gd` via optional
 factory Callables so headless tests can inject fakes.
 
+Phase 6B extends `McpJsonRpcDispatcher` with two observability
+concerns. The dispatcher now reads a `_forgekit_trace` envelope from
+each incoming request (transport-supplied `{trace_id, span_id}` pair)
+and mints a fresh 8-char / 4-char lowercase hex pair when the
+envelope is absent. The latest pair is readable through
+`get_last_trace_context()` so the WebSocket server can forward the
+same `trace_id` to `McpJsonlLogger.log(...)`. The dispatcher also
+exposes `set_metrics_sink(Callable)`: when registered, the sink
+receives one `mcp.requests.total` increment per dispatch and an
+additional `mcp.requests.errors` increment when the response is a
+JSON-RPC error envelope.
+
 ## MCP runtime bridge
 
 Runtime-side tools (gameplay state inspection, hot-reload hooks) live under
@@ -169,6 +181,16 @@ against `AudioStreamPlayer`), and `state_machine_runtime_tools.gd`
 (travel, get_current on
 `AnimationNodeStateMachinePlayback`). These tools only respond when the
 game was launched with the `--mcp-bridge` CLI flag.
+
+Phase 6B extends `McpBridge` with trace propagation. The UDP server
+calls `McpBridge.observe_packet(request)` once per accepted packet;
+when the parsed JSON-RPC envelope carries a `trace` field with
+`{trace_id, span_id}` (both 8-char / 4-char lowercase hex), the
+bridge echoes the pair through `get_last_trace_context()`, so
+downstream log lines emitted by `McpJsonlLogger.log(...)` carry the
+same identifier that appears on the editor and server channels.
+Missing or malformed envelopes are replaced with a freshly minted
+pair so every packet stays correlatable.
 
 ## MCP licensing
 
@@ -243,6 +265,47 @@ the compiled hook scripts. Changing the tsconfig `rootDir` or moving the CLI
 entry file requires updating the `..` count and the regression test in
 `test/cli_install_hooks.test.ts` (the test runs the compiled binary against
 a tmp git repo and asserts the shim points at an existing module).
+
+## Observability
+
+The MCP server exposes structured logs, a trace id that follows every
+JSON-RPC request end-to-end, and an in-memory metrics registry.
+
+- **JSON Lines log stream.** `mcp-server/src/observability/jsonl_logger.ts`
+  (class `JsonlLogger`) writes one line per event under
+  `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`. The line shape is shared
+  with the Godot side (`addons/forgekit_core/mcp/observability/jsonl_logger.gd`):
+  `{ts, level, component, trace_id?, span_id?, method?, duration_ms?, data?}`.
+  The minimum level is controlled by the `--mcp-log-level` CLI flag
+  (parsed by `parseCliArgs` in `src/index.ts`); lines below the
+  threshold are dropped. Files rotate by UTC date; no size-based
+  rotation in this phase.
+- **Trace ids.** `mcp-server/src/observability/trace.ts` exports
+  `generateTraceId()` (8-char lowercase hex), `generateSpanId()`
+  (4-char lowercase hex), and `newTraceContext()` which returns a
+  fresh `{trace_id, span_id}` pair. The JSON-RPC dispatcher reads a
+  `_forgekit_trace` envelope from incoming WebSocket frames; the UDP
+  runtime bridge reads a top-level `trace` field. When either is
+  absent the server mints a fresh pair so every request is
+  correlatable across both streams.
+- **Metrics registry.** `mcp-server/src/observability/metrics.ts`
+  (class `MetricsRegistry`) offers an idempotent named registry of
+  `Counter` and `Histogram` instances. The canonical names declared
+  as exported constants match the ones tracked by the health endpoint
+  and the Godot side:
+  `mcp.requests.total`, `mcp.requests.errors`,
+  `mcp.requests.duration_ms`, `mcp.heartbeat.drops`,
+  `mcp.reconnect.attempts`, `mcp.reconnect.backoff_ms`,
+  `mcp.editor_plugin.undo_stack_size`,
+  `mcp.runtime_bridge.udp_packets.received`,
+  `mcp.runtime_bridge.udp_packets.rejected`,
+  `mcp.healing.retries`. `registerCanonicalMetrics(registry)` registers
+  the full set in one call. Histograms keep a rolling window of the
+  most recent 1000 samples and report `count`, `sum`, `p50`, `p95`,
+  `p99` via `snapshot()` using the nearest-rank percentile rule.
+  The `mcp.editor_plugin.undo_stack_size` gauge is declared but
+  not yet wired — the `UndoRedoWrapper` has no stack-size signal to
+  subscribe to, so the delta emission is deferred to a future pass.
 
 ## Git hooks
 

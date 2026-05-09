@@ -140,6 +140,19 @@ the right channel per tool.
   `PACKET_TOO_LARGE`.
 - **Runs inside:** the running game, via the `McpBridge` autoload
   registered by ForgeKit Core.
+- **Trace context per datagram.** The `McpBridge` autoload exposes two
+  GDScript methods that anchor the runtime side of the shared
+  `trace_id` pipeline. `observe_packet(request)` is invoked once per
+  accepted UDP datagram with the parsed JSON-RPC envelope: when the
+  envelope carries a `trace` field of the form
+  `{ "trace_id": "<8 lowercase hex>", "span_id": "<4 lowercase hex>" }`
+  the bridge echoes that pair; otherwise it mints a fresh pair in the
+  same shape so every packet stays correlatable even when the sender
+  omits a trace envelope. `get_last_trace_context()` returns the pair
+  attached to the most recent observation as a duplicated dictionary
+  (`{}` before the first call), so downstream log and telemetry code
+  can tag engine-side log lines with the same `trace_id` that appears
+  on the server and editor channels.
 - **Mutation safety:** runtime tools do not touch on-disk state, so the
   Undo stack does not apply. `runtime.eval_safe` only evaluates the
   closed grammar implemented by `Smart_Type_Parser`; it never calls
@@ -162,6 +175,120 @@ the right channel per tool.
   server-side profile filter exposes these tools without any
   server-side code changes — they are pure Godot-side adapters
   selected by `profiles.json`.
+
+## Structured logging
+
+Both the MCP server (Node.js) and the Godot side write their own
+events as JSON Lines so operators can grep, tail, and correlate them
+with traces emitted by the other channels. The two sides share one
+wire format; only the destination differs.
+
+### Shared line shape
+
+Each line is a self-contained JSON object:
+
+```json
+{
+  "ts": "2026-05-09T12:34:56.000Z",
+  "level": "info",
+  "component": "<component name>",
+  "trace_id": "<optional>",
+  "span_id": "<optional>",
+  "method": "<optional JSON-RPC method>",
+  "duration_ms": 0,
+  "data": { "<caller fields>": "<...>" }
+}
+```
+
+`ts`, `level`, and `component` are always present. `trace_id`,
+`span_id`, `method`, and `duration_ms` are promoted to the top level
+when the caller supplies them so they remain easy to filter on. Every
+other caller-supplied field is nested under `data`.
+
+The `trace_id` is the same identifier propagated across the three MCP
+channels, so a single request can be followed from the agent through
+the server into the editor plugin or the runtime bridge by grepping
+one field.
+
+### Server side — `@forgekit/core-mcp`
+
+- **Destination.** One file per UTC day at
+  `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`. The directory is created
+  on the first write.
+- **Default level.** `info`. Events below the configured level are
+  dropped silently.
+
+### Godot side — `McpJsonlLogger`
+
+- **Class.** `McpJsonlLogger` (`addons/forgekit_core/mcp/observability/jsonl_logger.gd`).
+  A `RefCounted` helper any Godot-side component can instantiate and
+  call as `logger.log(level, component, data)`.
+- **Destination.** `<base_dir>/<component>/<YYYY-MM-DD>.jsonl`, where
+  `base_dir` defaults to `user://mcp_logs`. The component
+  sub-directory is created recursively on first write, so each logical
+  source (`editor_plugin`, `runtime_bridge`, ...) gets its own stream.
+- **Rotation.** Files rotate by UTC date derived from the `ts` field,
+  so a log call at `23:59:58Z` and one at `00:00:02Z` the next day
+  land in different files without any runtime bookkeeping.
+- **Default level.** `info`. The level can be overridden per instance
+  by assigning to the `level` property, or globally at construction
+  time through the `FORGEKIT_MCP_LOG_LEVEL` environment variable
+  (`debug | info | warn | error`). Lines below the configured
+  threshold are dropped silently.
+- **Timestamp format.** ISO-8601 UTC with millisecond resolution and a
+  `Z` suffix (for example `2026-05-16T18:12:33.540Z`), matching the
+  server side's `Date.toISOString()` output.
+
+## Metrics
+
+Both the MCP server and the Godot-side JSON-RPC dispatcher emit
+counter-style metrics for every handled request. The two sides share
+one set of canonical counter names so a single dashboard can total
+requests across the editor plugin, the runtime bridge, and the server
+transport.
+
+### Canonical counter names
+
+| Name                     | Increments on                                            |
+| ------------------------ | -------------------------------------------------------- |
+| `mcp.requests.total`     | every dispatch (success, error, or notification ack)     |
+| `mcp.requests.errors`    | every dispatch that returns a JSON-RPC error envelope    |
+
+`mcp.requests.total` is always incremented first, and
+`mcp.requests.errors` is incremented alongside it when the response is
+an error. A dispatch that returns an empty dictionary (a notification
+without a reply) still counts as a success against
+`mcp.requests.total`.
+
+### Server side — `@forgekit/core-mcp`
+
+The canonical names are exported from
+`mcp-server/src/observability/metrics.ts` as
+`METRIC_REQUESTS_TOTAL` and `METRIC_REQUESTS_ERRORS`, alongside
+`METRIC_REQUESTS_DURATION_MS` and the heartbeat / reconnect counters.
+The server's `MetricsRegistry` owns the actual `Counter` instances;
+downstream code obtains them by name through
+`registerCounter(name)`.
+
+### Godot side — `McpJsonRpcDispatcher`
+
+- **Class.** `McpJsonRpcDispatcher`
+  (`addons/forgekit_core/mcp/editor_plugin/json_rpc_dispatcher.gd`).
+  The dispatcher's `set_metrics_sink(callable)` method installs an
+  optional sink invoked as `sink.call(name, delta)` on every
+  dispatch.
+- **Emission.** The sink fires once per dispatch with
+  `("mcp.requests.total", 1)`, and again with
+  `("mcp.requests.errors", 1)` when the response carries a JSON-RPC
+  `error` envelope. Registering an empty `Callable` unregisters the
+  sink; when no sink is installed the dispatcher silently skips
+  emission.
+- **Injection pattern.** The sink is a `Callable` rather than an
+  object reference so tests and the editor-plugin lifecycle can wire
+  any object that exposes a single
+  `(name: String, delta: int) -> void` method — for example the
+  server's forwarding sink that funnels Godot-side counters into the
+  same `MetricsRegistry` as the TypeScript side.
 
 ## Browser Visualizer — optional HTTP preview
 

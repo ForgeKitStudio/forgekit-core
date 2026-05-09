@@ -12,6 +12,68 @@ every published tag has a matching entry.
 
 ### Added
 
+- **Phase 6B — SKILLS pack completion + observability foundation:**
+  - **SKILLS pack (Phase 6.15).** Populated the three remaining
+    scenario files (`authoring_items.md`,
+    `debugging_failing_tests.md`, `self_healing_tres.md`) to the
+    same quality as `module_licensing.md`. Every skill now carries
+    `api_version: 0.7.0`, a scenario description, an ordered MCP
+    tool call sequence, error-handling guidance, and an example
+    user query.
+  - **Structured logs (Phase 6.16).** New `JsonlLogger` on both
+    sides:
+    - Godot: `addons/forgekit_core/mcp/observability/jsonl_logger.gd`
+      (`class_name McpJsonlLogger`) writing to
+      `user://mcp_logs/<component>/<YYYY-MM-DD>.jsonl`. Configurable
+      via the `FORGEKIT_MCP_LOG_LEVEL` env var.
+    - Server: `mcp-server/src/observability/jsonl_logger.ts`
+      writing to `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl`.
+      Configurable via the `--mcp-log-level` CLI flag already
+      parsed by `parseCliArgs`.
+    - Shared line shape:
+      `{ts, level, component, trace_id?, span_id?, method?, duration_ms?, data?}`
+      so a single trace id can be grep'd across streams.
+    - Files rotate by UTC date; each line is appended atomically
+      with no cross-line buffering.
+  - **Trace id + span id (Phase 6.17).**
+    - `mcp-server/src/observability/trace.ts` exports
+      `generateTraceId()` (8-char lowercase hex),
+      `generateSpanId()` (4-char lowercase hex), and
+      `newTraceContext()` returning `{trace_id, span_id}`.
+    - `McpJsonRpcDispatcher` (editor channel) reads
+      `_forgekit_trace` from incoming requests, mints a fresh pair
+      when absent, and surfaces the pair through
+      `get_last_trace_context()`.
+    - `McpBridge` (runtime channel) exposes
+      `observe_packet(request)` / `get_last_trace_context()`; the
+      UDP server calls the former per accepted packet, reading the
+      top-level `trace` field.
+  - **Metrics registry (Phase 6.18).**
+    - `mcp-server/src/observability/metrics.ts` adds `Counter`,
+      `Histogram` (rolling window of 1000 observations with
+      nearest-rank `p50/p95/p99`), and a `MetricsRegistry` with
+      idempotent `registerCounter(name)` /
+      `registerHistogram(name)`.
+    - Canonical metric names declared as exported constants:
+      `mcp.requests.total`, `mcp.requests.errors`,
+      `mcp.requests.duration_ms`, `mcp.heartbeat.drops`,
+      `mcp.reconnect.attempts`, `mcp.reconnect.backoff_ms`,
+      `mcp.editor_plugin.undo_stack_size`,
+      `mcp.runtime_bridge.udp_packets.received`,
+      `mcp.runtime_bridge.udp_packets.rejected`,
+      `mcp.healing.retries`.
+    - `registerCanonicalMetrics(registry)` installs the full set.
+    - Dispatcher integration: `McpJsonRpcDispatcher.set_metrics_sink(Callable)`
+      surfaces `mcp.requests.total` on every dispatch and
+      `mcp.requests.errors` on JSON-RPC error responses. Sinks may
+      translate these calls into any downstream metric registry.
+  - **Deferred:** `mcp.editor_plugin.undo_stack_size` is declared
+    but not automatically emitted — the editor `UndoRedoWrapper`
+    has no stack-size signal to subscribe to. Wiring will land in a
+    future pass when the wrapper exposes the needed observable.
+
+### Added (Phase 6A — previous sub-delivery)
+
 - **Phase 6A — 67 new MCP tools across 14 categories filling the v1.0
   Full parity gap with competing Godot MCP servers:**
   - **Animation** (6 editor-channel tools): `animation.list`, `animation.play`,

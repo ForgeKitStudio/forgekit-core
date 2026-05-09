@@ -64,6 +64,23 @@ var _expected_token: String = ""
 # socket. `null` means no-op.
 var _on_unauthorized: Callable = Callable()
 
+# Trace context {trace_id, span_id} attached to the most recent dispatch()
+# call. Transports read it after `dispatch()` returns to forward log lines
+# through `McpJsonlLogger.log(..., trace_id, span_id)`. Initialised to an
+# empty Dictionary until the first dispatch completes.
+var _last_trace_context: Dictionary = {}
+
+# Optional metrics sink. Invoked as `sink.call(metric_name, delta)` for
+# every canonical counter the dispatcher emits:
+#   - `mcp.requests.total` on every dispatch (success, error, or
+#     notification).
+#   - `mcp.requests.errors` on every dispatch that returns a JSON-RPC
+#     error envelope.
+# Kept as a Callable rather than an object reference so tests and the
+# production lifecycle can inject any sink that exposes a single
+# `(name: String, delta: int) -> void` method.
+var _metrics_sink: Callable = Callable()
+
 
 ## Configure the shared auth token this dispatcher compares against the
 ## per-request token passed to `dispatch()`. An empty string disables the
@@ -77,6 +94,22 @@ func set_auth_token(token: String) -> void:
 ## empty Callable to clear.
 func set_on_unauthorized(callable: Callable) -> void:
 	_on_unauthorized = callable
+
+
+## Read the trace context (`{trace_id, span_id}`) attached to the most
+## recent `dispatch()` call. Returns an empty Dictionary before the first
+## dispatch completes.
+func get_last_trace_context() -> Dictionary:
+	return _last_trace_context.duplicate(true)
+
+
+## Register a metrics sink Callable. `sink` is invoked as
+## `sink.call(metric_name: String, delta: int)` on every dispatch, once
+## with `mcp.requests.total` + `1`, and again with `mcp.requests.errors`
+## + `1` when the dispatcher returns a JSON-RPC error envelope. Pass an
+## empty Callable to unregister the sink.
+func set_metrics_sink(callable: Callable) -> void:
+	_metrics_sink = callable
 
 
 ## Register `callable` as the handler for `method`. Collisions emit a
@@ -108,6 +141,15 @@ func unregister_handler(method: String) -> void:
 ## return value is an empty Dictionary; on a successful call the return
 ## value is a result envelope `{jsonrpc, result, id}`.
 func dispatch(raw: Variant, request_token: String = "") -> Dictionary:
+	var response: Dictionary = _dispatch_inner(raw, request_token)
+	_emit_request_metrics(response)
+	return response
+
+
+## Internal dispatch core. Kept separate so the public `dispatch()` can
+## emit observability metrics once per call regardless of which return
+## path the core took.
+func _dispatch_inner(raw: Variant, request_token: String) -> Dictionary:
 	var request: Dictionary = {}
 
 	if raw is String:
@@ -118,14 +160,23 @@ func dispatch(raw: Variant, request_token: String = "") -> Dictionary:
 		var parser: JSON = JSON.new()
 		var parse_err: int = parser.parse(raw)
 		if parse_err != OK or not (parser.data is Dictionary):
+			_last_trace_context = _new_trace_context()
 			return _error_envelope(PARSE_ERROR, PARSE_ERROR_MESSAGE, null,
 				"Request body is not valid JSON; expected a JSON-RPC 2.0 object.")
 		request = parser.data
 	elif raw is Dictionary:
 		request = raw
 	else:
+		_last_trace_context = _new_trace_context()
 		return _error_envelope(INVALID_REQUEST, INVALID_REQUEST_MESSAGE, null,
 			"Request must be a Dictionary or a JSON-encoded String.")
+
+	# ---- trace context ---------------------------------------------------
+	# Transports inject `_forgekit_trace` ({trace_id, span_id}) when they
+	# are carrying a trace from an upstream caller. When absent, mint a
+	# fresh pair so every request is correlatable even if the edge did
+	# not inject one.
+	_last_trace_context = _extract_or_mint_trace_context(request)
 
 	# ---- id validation comes first so later errors can echo it -----------
 	var has_id: bool = request.has("id")
@@ -284,3 +335,80 @@ func _format_available_methods() -> String:
 		return ", ".join(names)
 	var truncated: Array = names.slice(0, _SUGGESTION_METHOD_LIMIT)
 	return "%s, ..." % ", ".join(truncated)
+
+
+# ---------------------------------------------------------------------------
+# Trace context helpers.
+# ---------------------------------------------------------------------------
+
+## Extract `{trace_id, span_id}` from the `_forgekit_trace` envelope when
+## both fields parse as hex strings of the expected width; otherwise mint a
+## fresh pair. Returns a new Dictionary on every call.
+func _extract_or_mint_trace_context(request: Dictionary) -> Dictionary:
+	if request.has("_forgekit_trace"):
+		var envelope: Variant = request.get("_forgekit_trace")
+		if envelope is Dictionary:
+			var dict: Dictionary = envelope as Dictionary
+			var trace_id: String = String(dict.get("trace_id", ""))
+			var span_id: String = String(dict.get("span_id", ""))
+			if _is_valid_trace_id(trace_id) and _is_valid_span_id(span_id):
+				return {"trace_id": trace_id, "span_id": span_id}
+	return _new_trace_context()
+
+
+## Mint an 8-char lowercase hex trace_id plus a 4-char lowercase hex
+## span_id. Uses `randi()` which is seeded from the system clock at startup
+## so values are non-deterministic but reproducible under a manual
+## `seed()` call from tests if needed.
+func _new_trace_context() -> Dictionary:
+	return {
+		"trace_id": _random_hex_lowercase(8),
+		"span_id": _random_hex_lowercase(4),
+	}
+
+
+static func _random_hex_lowercase(width: int) -> String:
+	var out: String = ""
+	for i in range(width):
+		out += _HEX_ALPHABET[randi() % 16]
+	return out
+
+
+const _HEX_ALPHABET: Array = ["0", "1", "2", "3", "4", "5", "6", "7",
+	"8", "9", "a", "b", "c", "d", "e", "f"]
+
+
+static func _is_valid_trace_id(value: String) -> bool:
+	return _is_lowercase_hex(value, 8)
+
+
+static func _is_valid_span_id(value: String) -> bool:
+	return _is_lowercase_hex(value, 4)
+
+
+static func _is_lowercase_hex(value: String, expected_width: int) -> bool:
+	if value.length() != expected_width:
+		return false
+	for c in value:
+		var is_digit: bool = c >= "0" and c <= "9"
+		var is_lower_hex: bool = c >= "a" and c <= "f"
+		if not is_digit and not is_lower_hex:
+			return false
+	return true
+
+
+# ---------------------------------------------------------------------------
+# Metrics wiring.
+# ---------------------------------------------------------------------------
+
+## Emit `mcp.requests.total` plus (when the response is an error envelope)
+## `mcp.requests.errors`. Silently no-ops when no sink has been
+## registered. A response with an `error` Dictionary is treated as an
+## error; anything else (including empty-dictionary notification
+## acknowledgements) is a success.
+func _emit_request_metrics(response: Dictionary) -> void:
+	if not _metrics_sink.is_valid():
+		return
+	_metrics_sink.call("mcp.requests.total", 1)
+	if response.has("error"):
+		_metrics_sink.call("mcp.requests.errors", 1)

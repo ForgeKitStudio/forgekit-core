@@ -35,6 +35,12 @@ var config: Object = null
 # Live server instance or null when the bridge is not active.
 var _server: Object = null
 
+# Trace context {trace_id, span_id} attached to the most recent
+# observe_packet() call. Transports read it after a dispatch so log
+# lines can be correlated across processes. Initialised to an empty
+# Dictionary until the first observation completes.
+var _last_trace_context: Dictionary = {}
+
 
 func _ready() -> void:
 	var _result: Dictionary = activate(OS.get_cmdline_args())
@@ -83,6 +89,25 @@ func get_server() -> Object:
 	return _server
 
 
+## Read the trace context (`{trace_id, span_id}`) attached to the most
+## recent `observe_packet()` call. Returns an empty Dictionary before
+## the first observation completes.
+func get_last_trace_context() -> Dictionary:
+	return _last_trace_context.duplicate(true)
+
+
+## Surface the trace context carried by an incoming UDP packet. The
+## UDP server calls this once per accepted packet, passing the parsed
+## JSON-RPC envelope. When the envelope carries a `trace` field with
+## `{trace_id, span_id}` and both fields parse as hex strings of the
+## expected width (8 / 4 lowercase hex chars), the bridge echoes them;
+## otherwise a fresh pair is minted so every packet remains
+## correlatable even when the sender did not inject a trace envelope.
+func observe_packet(request: Variant) -> Dictionary:
+	_last_trace_context = _extract_or_mint_trace_context(request)
+	return _last_trace_context.duplicate(true)
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
@@ -92,3 +117,44 @@ static func _cli_flag_present(cli_args: Array) -> bool:
 		if String(arg) == ACTIVATION_CLI_FLAG:
 			return true
 	return false
+
+
+## Extract `{trace_id, span_id}` from the `trace` field of an incoming
+## UDP payload; mint a fresh pair when the field is missing or invalid.
+static func _extract_or_mint_trace_context(request: Variant) -> Dictionary:
+	if request is Dictionary:
+		var dict: Dictionary = request as Dictionary
+		if dict.has("trace"):
+			var envelope: Variant = dict.get("trace")
+			if envelope is Dictionary:
+				var trace_dict: Dictionary = envelope as Dictionary
+				var trace_id: String = String(trace_dict.get("trace_id", ""))
+				var span_id: String = String(trace_dict.get("span_id", ""))
+				if _is_lowercase_hex(trace_id, 8) and _is_lowercase_hex(span_id, 4):
+					return {"trace_id": trace_id, "span_id": span_id}
+	return {
+		"trace_id": _random_hex_lowercase(8),
+		"span_id": _random_hex_lowercase(4),
+	}
+
+
+const _HEX_ALPHABET: Array = ["0", "1", "2", "3", "4", "5", "6", "7",
+	"8", "9", "a", "b", "c", "d", "e", "f"]
+
+
+static func _random_hex_lowercase(width: int) -> String:
+	var out: String = ""
+	for i in range(width):
+		out += _HEX_ALPHABET[randi() % 16]
+	return out
+
+
+static func _is_lowercase_hex(value: String, expected_width: int) -> bool:
+	if value.length() != expected_width:
+		return false
+	for c in value:
+		var is_digit: bool = c >= "0" and c <= "9"
+		var is_lower_hex: bool = c >= "a" and c <= "f"
+		if not is_digit and not is_lower_hex:
+			return false
+	return true

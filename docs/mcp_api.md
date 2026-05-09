@@ -1833,3 +1833,91 @@ Three CLI-channel tools that shell out to `adb`.
 
 - **Params:** `{filter?, duration_ms?}`.
 - **Result:** `{log_lines: [string]}`. Runs `adb logcat` with the optional filter expression.
+
+## Observability
+
+Phase 6B adds an observability layer covering structured logs, trace
+propagation, and an in-memory metrics registry. The three concerns
+live under `mcp-server/src/observability/` on the server side and
+`addons/forgekit_core/mcp/observability/` on the Godot side.
+
+### JSON Lines log stream
+
+Every MCP component writes one JSON line per event. The shared line
+shape is:
+
+```json
+{
+  "ts": "2026-05-16T18:12:33.540Z",
+  "level": "info",
+  "component": "editor_plugin",
+  "trace_id": "abcd1234",
+  "span_id": "0001",
+  "method": "scene.open",
+  "duration_ms": 12,
+  "data": { "path": "res://levels/forest.tscn" }
+}
+```
+
+`ts`, `level`, and `component` are always present. `trace_id`,
+`span_id`, `method`, and `duration_ms` are hoisted to the top level
+when the caller supplies them. All other caller-supplied fields live
+under `data`.
+
+| Side | File path | Rotation | Level flag |
+| ---- | --------- | -------- | ---------- |
+| Server | `$HOME/.forgekit/logs/<YYYY-MM-DD>.jsonl` | One file per UTC day. Created on first write. | `--mcp-log-level <debug\|info\|warn\|error>` |
+| Godot | `user://mcp_logs/<component>/<YYYY-MM-DD>.jsonl` | One file per component per UTC day. Created on first write. | `FORGEKIT_MCP_LOG_LEVEL` env var, or `logger.level = &"…"` per instance. |
+
+Lines below the configured level are dropped silently.
+
+### Trace propagation
+
+Every MCP request carries a `trace_id` so log lines emitted by the
+server, the editor plugin, and the runtime bridge can be correlated
+with a single `grep`.
+
+- `trace_id` — 8-char lowercase hex (`[0-9a-f]{8}`), 32 bits of
+  entropy per request.
+- `span_id`  — 4-char lowercase hex (`[0-9a-f]{4}`), identifies
+  sub-operations inside one trace.
+
+Transport embedding:
+
+- **Editor channel (WebSocket).** Clients MAY include a
+  `_forgekit_trace: {trace_id, span_id}` field on the incoming
+  JSON-RPC request. The dispatcher echoes it through
+  `get_last_trace_context()`. Missing or malformed envelopes are
+  replaced with a freshly minted pair so every request is
+  correlatable.
+- **Runtime channel (UDP).** Clients MAY include a top-level `trace`
+  field with the same shape. `McpBridge.observe_packet(request)`
+  echoes it through `get_last_trace_context()`.
+- **Server.** `generateTraceId()`, `generateSpanId()`, and
+  `newTraceContext()` mint fresh pairs from
+  `mcp-server/src/observability/trace.ts` whenever the upstream
+  transport did not supply one.
+
+### Metrics registry
+
+`mcp-server/src/observability/metrics.ts` exposes a lightweight
+`MetricsRegistry` with two metric kinds and an idempotent named
+lookup (`registerCounter(name)` / `registerHistogram(name)`; repeat
+calls return the existing instance).
+
+| Name | Kind | Meaning |
+| ---- | ---- | ------- |
+| `mcp.requests.total` | counter | Per JSON-RPC request, incremented before dispatch. |
+| `mcp.requests.errors` | counter | Per failed JSON-RPC response. |
+| `mcp.requests.duration_ms` | histogram | Observed on every response. |
+| `mcp.heartbeat.drops` | counter | Heartbeat monitor detected a gap > 10 s. |
+| `mcp.reconnect.attempts` | counter | Per reconnect attempt. |
+| `mcp.reconnect.backoff_ms` | histogram | Observed backoff duration per attempt. |
+| `mcp.editor_plugin.undo_stack_size` | counter (inc/dec) | Undo stack depth delta. Declared but wiring deferred — `UndoRedoWrapper` has no stack-size signal. |
+| `mcp.runtime_bridge.udp_packets.received` | counter | Per datagram entering the runtime packet parser. |
+| `mcp.runtime_bridge.udp_packets.rejected` | counter | Per datagram rejected by the parser. |
+| `mcp.healing.retries` | counter | Per `resource.apply_fix` attempt recorded by the self-healing retry counter. |
+
+Histograms keep a rolling window of the most recent 1000 observations
+and report `{count, sum, p50, p95, p99}` via `snapshot()`, using the
+nearest-rank percentile rule (`index = ceil(p * n) - 1`).
