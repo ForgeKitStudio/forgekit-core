@@ -10,6 +10,34 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-05-09
+
+### Changed
+
+- **CI pipeline now actually runs.** Every required status check
+  (`tests-unit`, `tests-property`, `tests-gameplay`, `check-imports`,
+  `language-policy`, `coverage-matrix`, `check-pr-template`) was
+  previously gated on `[ -f "addons/gut/gut_cmdln.gd" ]`. GUT is
+  intentionally not vendored in the public template, so every job
+  fell through to the `echo "placeholder - <suite> not yet present
+  (phase 0)"` fallback and exited 0. The workflow now installs GUT
+  9.6.0 from the upstream GitHub release tarball inline in each
+  test job and builds the MCP server for `check-imports` /
+  `check-pr-template`, so any regression actually turns the
+  required status check red.
+
+### Fixed
+
+- `project.check_imports` no longer flags
+  `addons/forgekit_rpg/public_api.gd` as a rule 1.3 violation.
+  `public_api.gd` is the explicit aggregator that re-exports every
+  subsystem; flagging it was a false positive. Other files under
+  `addons/forgekit_rpg/<subsystem>/` are still required to route
+  cross-subsystem references through `public_api.gd`. The property
+  test oracle is unchanged (it generates only
+  `addons/forgekit_rpg/<subsystem>/...` files), so the fix does not
+  affect Property 7.
+
 ## [0.9.1] - 2026-05-09
 
 ### Added
