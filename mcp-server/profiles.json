@@ -547,6 +547,90 @@
       "scope": "module",
       "channel": "runtime",
       "module": "vendor"
+    },
+    {
+      "name": "visualizer.start",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.stop",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.render_scene_tree",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.render_module_graph",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.render_event_bus",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.sprite_from_svg",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.atlas_pack",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.noise_texture",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.icon_set",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.suggest_action",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.inspect_failure",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.get_retry_count",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.reset_retry_count",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.apply_and_retest",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
     }
   ]
 }

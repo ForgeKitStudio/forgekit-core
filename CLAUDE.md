@@ -121,8 +121,24 @@ The editor-side tools live under
 `addons/forgekit_core/mcp/editor_plugin/`. They are read-only for agents.
 All scene / node mutations performed by these tools flow through the
 `UndoRedoWrapper` so editor history stays consistent and operations can
-be rolled back. This section is a placeholder that will be expanded as the
-editor tool surface lands in later phases.
+be rolled back.
+
+Phase 5 adds three subtrees alongside the existing `tools/` directory:
+
+- `visualizer/` — HTTP server that serves the three-view browser
+  visualizer (scene tree, module graph, event bus) on the first free
+  port in `6030-6039`.
+- `asset_generator/` — `McpSvgRasterizer`, `McpTexturePacker`,
+  `McpNoiseGenerator`, `McpIconSetGenerator` backing the four
+  `assetgen.*` MCP tools. Every write routes through
+  `McpUndoRedoWrapper` so a single Ctrl+Z reverts the file.
+- `healing/` — `McpRetryCounter`, `McpHealingSuggester`,
+  `McpHealingInspector`, `McpHealingTools` backing the five
+  `healing.*` MCP tools. Limits retries to 3 per resource per session;
+  escalates to `manual_review` on exhaustion (Property 22).
+
+The adapters are wired in through `plugin_lifecycle.gd` via optional
+factory Callables so headless tests can inject fakes.
 
 ## MCP runtime bridge
 
@@ -148,6 +164,23 @@ select which tool subset is active for a given client. Changes to the server
 tree must come with a matching update to this section so the Context Commits
 hook accepts the commit. Per-tool documentation and transport details live
 in `docs/mcp_api.md`.
+
+As of the `Unreleased` block in `CHANGELOG.md`, the `core`-scoped surface
+includes three new editor-channel categories added by Phase 5:
+
+- **Visualizer** — `visualizer.start`, `visualizer.stop`,
+  `visualizer.render_scene_tree`, `visualizer.render_module_graph`,
+  `visualizer.render_event_bus`. Backed by the HTTP server at
+  `addons/forgekit_core/mcp/editor_plugin/visualizer/http_server.gd`.
+- **Asset Generation** — `assetgen.sprite_from_svg`,
+  `assetgen.atlas_pack`, `assetgen.noise_texture`, `assetgen.icon_set`.
+  Every write is funnelled through `McpUndoRedoWrapper`.
+- **Self-Healing** — `healing.suggest_action`, `healing.inspect_failure`,
+  `healing.get_retry_count`, `healing.reset_retry_count`,
+  `healing.apply_and_retest`. Shares the `ALLOWED_SUGGESTED_ACTIONS`
+  set (`inspect_tres`, `validate_gdscript`, `rerun_test`,
+  `manual_review`) between the GDScript implementation and the
+  TypeScript port under `mcp-server/src/healing/suggest_action.ts`.
 
 The `ToolModule` union in `mcp-server/src/profiles.ts` enumerates every
 module id recognized by the profile filter. As of v0.7.0 it covers
