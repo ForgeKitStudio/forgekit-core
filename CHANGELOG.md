@@ -10,6 +10,26 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-05-09
+
+### Fixed
+
+- `npm-publish.yml` now installs headless Godot 4.6.2 (matching
+  `ci.yml`) so the publish-gate vitest sanity run can execute the
+  three property tests that shell out to the Godot binary (P14
+  GDScript validator, P15 save-iff-valid, P30 input simulator). The
+  gate failed with `spawn godot ENOENT` on every prior tag push
+  (v0.6.0, v0.7.0, v0.8.0), blocking the npm publish even though the
+  GitHub Release itself landed successfully. First tag that actually
+  ships `@forgekit/core-mcp` to the npm registry.
+
+### Notes
+
+- v0.8.0 GitHub Release (the Godot addon ZIP) remains the canonical
+  v1.0-feature-parity release. v0.8.1 is a workflow-only patch; no
+  code changes in `addons/forgekit_core/` or `mcp-server/src/`.
+- Pairs with the same `forgekit-rpg v0.7.0`.
+
 ## [0.8.0] - 2026-05-09
 
 ### Added
@@ -391,7 +411,8 @@ every published tag has a matching entry.
   workflows, git hook installer (`commit-msg`, `pre-commit`) covering
   Conventional Commits and Context Commits enforcement.
 
-[Unreleased]: https://github.com/ForgeKitStudio/forgekit-core/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/ForgeKitStudio/forgekit-core/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.8.1
 [0.8.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ForgeKitStudio/forgekit-core/releases/tag/v0.6.0
