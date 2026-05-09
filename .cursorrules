@@ -78,6 +78,13 @@ Phase 4B additions (consumed by the RPG module's effects / magic / equipment sub
 the canonical data containers. Both expose `validate() -> Array[String]` and
 `to_dict` / `from_dict` for stable round-trips through the MCP surface.
 
+`EquipableItemResource` (`addons/forgekit_core/resources/equipable_item_resource.gd`)
+extends `ItemResource` with the `slot`, `stat_modifiers`,
+`status_effects_on_equip`, and `requirements` fields that the RPG
+module's `EquipmentSystem` consumes. Authoring lives under
+`addons/forgekit_rpg/inventory/items/`; the class itself is Core-owned so
+future MIT modules can depend on the same shape.
+
 Authoring `.tres` files is a client-side activity and happens under
 `addons/forgekit_rpg/**/items/` or `addons/forgekit_rpg/**/recipes/`. Use
 `TresLoader` (`addons/forgekit_core/resources/tres_loader.gd`) to validate
