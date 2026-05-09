@@ -304,3 +304,103 @@ func test_enter_tree_without_phase5_factories_is_still_a_valid_lifecycle() -> vo
 	lifecycle.exit_tree()
 	assert_eq(server.start_calls, 1, "lifecycle without phase 5 factories must still start the websocket server")
 	assert_eq(server.stop_calls, 1, "lifecycle without phase 5 factories must still stop the websocket server")
+
+
+
+# ---------------------------------------------------------------------------
+# Phase 6A additions: twelve editor-channel tool adapter factories register
+# the new MCP tool categories on enter_tree.
+# ---------------------------------------------------------------------------
+
+
+func _make_phase6a_lifecycle() -> Dictionary:
+	var ws_server: FakeWebSocketServer = FakeWebSocketServer.new()
+	var dispatcher: FakeDispatcher = FakeDispatcher.new()
+	var adapters: Dictionary = {
+		"animation": FakeToolAdapter.new(["animation.list"] as Array[String]),
+		"tilemap": FakeToolAdapter.new(["tilemap.set_cell"] as Array[String]),
+		"theme_ui": FakeToolAdapter.new(["theme.create"] as Array[String]),
+		"shader": FakeToolAdapter.new(["shader.create"] as Array[String]),
+		"physics": FakeToolAdapter.new(["physics.set_gravity"] as Array[String]),
+		"scene3d": FakeToolAdapter.new(["scene3d.add_mesh_instance"] as Array[String]),
+		"particle": FakeToolAdapter.new(["particle.create_gpu"] as Array[String]),
+		"navigation": FakeToolAdapter.new(["navigation.bake_mesh"] as Array[String]),
+		"audio": FakeToolAdapter.new(["audio.list_buses"] as Array[String]),
+		"animation_tree": FakeToolAdapter.new(["animation_tree.create"] as Array[String]),
+		"state_machine": FakeToolAdapter.new(["state_machine.list_states"] as Array[String]),
+		"blend_tree": FakeToolAdapter.new(["blend_tree.configure_node"] as Array[String]),
+	}
+
+	var lifecycle: Object = LIFECYCLE_SCRIPT.new()
+	lifecycle.server_factory = func() -> Object:
+		return ws_server
+	lifecycle.dispatcher_factory = func() -> Object:
+		return dispatcher
+	lifecycle.animation_tools_factory = func() -> Object:
+		return adapters["animation"]
+	lifecycle.tilemap_tools_factory = func() -> Object:
+		return adapters["tilemap"]
+	lifecycle.theme_ui_tools_factory = func() -> Object:
+		return adapters["theme_ui"]
+	lifecycle.shader_tools_factory = func() -> Object:
+		return adapters["shader"]
+	lifecycle.physics_tools_factory = func() -> Object:
+		return adapters["physics"]
+	lifecycle.scene3d_tools_factory = func() -> Object:
+		return adapters["scene3d"]
+	lifecycle.particle_tools_factory = func() -> Object:
+		return adapters["particle"]
+	lifecycle.navigation_tools_factory = func() -> Object:
+		return adapters["navigation"]
+	lifecycle.audio_tools_factory = func() -> Object:
+		return adapters["audio"]
+	lifecycle.animation_tree_tools_factory = func() -> Object:
+		return adapters["animation_tree"]
+	lifecycle.state_machine_tools_factory = func() -> Object:
+		return adapters["state_machine"]
+	lifecycle.blend_tree_tools_factory = func() -> Object:
+		return adapters["blend_tree"]
+
+	return {
+		"lifecycle": lifecycle,
+		"dispatcher": dispatcher,
+		"adapters": adapters,
+	}
+
+
+func test_enter_tree_registers_all_phase6a_tool_adapters_on_dispatcher() -> void:
+	var env: Dictionary = _make_phase6a_lifecycle()
+	env["lifecycle"].enter_tree()
+	var adapters: Dictionary = env["adapters"]
+	var dispatcher: FakeDispatcher = env["dispatcher"]
+	for key in adapters.keys():
+		var adapter: FakeToolAdapter = adapters[key]
+		assert_eq(adapter.register_calls, 1,
+			"Phase 6A adapter '%s' must register exactly once" % key)
+	# Spot-check one method from each category to confirm the chain worked.
+	for method in [
+		"animation.list",
+		"tilemap.set_cell",
+		"theme.create",
+		"shader.create",
+		"physics.set_gravity",
+		"scene3d.add_mesh_instance",
+		"particle.create_gpu",
+		"navigation.bake_mesh",
+		"audio.list_buses",
+		"animation_tree.create",
+		"state_machine.list_states",
+		"blend_tree.configure_node",
+	]:
+		assert_true(dispatcher.registered.has(method),
+			"Method %s must be registered via Phase 6A adapter" % method)
+
+
+func test_enter_tree_without_phase6a_factories_remains_backwards_compatible() -> void:
+	# Lifecycles pre-dating Phase 6A must still work without the new
+	# factories being wired.
+	var server: FakeWebSocketServer = FakeWebSocketServer.new()
+	var lifecycle: Object = _make_lifecycle(server)
+	lifecycle.enter_tree()
+	lifecycle.exit_tree()
+	assert_eq(server.start_calls, 1, "pre-Phase 6A lifecycle must still start the websocket server")

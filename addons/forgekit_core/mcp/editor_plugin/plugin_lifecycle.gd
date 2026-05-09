@@ -57,6 +57,23 @@ var visualizer_tools_factory: Callable = Callable()
 var asset_generator_tools_factory: Callable = Callable()
 var healing_tools_factory: Callable = Callable()
 
+# Factories for the twelve Phase 6A editor-channel tool adapters. Each
+# takes no arguments and returns an Object exposing `register_on(dispatcher)`.
+# Left as empty Callables so older tests that only wired server/dispatcher
+# continue to pass.
+var animation_tools_factory: Callable = Callable()
+var tilemap_tools_factory: Callable = Callable()
+var theme_ui_tools_factory: Callable = Callable()
+var shader_tools_factory: Callable = Callable()
+var physics_tools_factory: Callable = Callable()
+var scene3d_tools_factory: Callable = Callable()
+var particle_tools_factory: Callable = Callable()
+var navigation_tools_factory: Callable = Callable()
+var audio_tools_factory: Callable = Callable()
+var animation_tree_tools_factory: Callable = Callable()
+var state_machine_tools_factory: Callable = Callable()
+var blend_tree_tools_factory: Callable = Callable()
+
 # Optional configuration Resource forwarded to `server.start(config)`.
 # Null means the server falls back to its embedded defaults (127.0.0.1,
 # ports 6010-6019).
@@ -69,6 +86,10 @@ var _dispatcher: Object = null
 var _visualizer_tools: Object = null
 var _asset_generator_tools: Object = null
 var _healing_tools: Object = null
+
+# Phase 6A adapters. Held in a dictionary so adding/removing categories
+# does not require a new field per category.
+var _phase6a_tools: Dictionary = {}
 
 
 ## Start the WebSocket server and, if the corresponding factories are
@@ -101,6 +122,38 @@ func enter_tree() -> void:
 			_healing_tools = healing_tools_factory.call()
 			if _healing_tools != null:
 				_healing_tools.register_on(_dispatcher)
+		_register_phase6a_tools()
+
+
+## Register every Phase 6A tool adapter whose factory is wired. Each
+## adapter follows the same `factory() -> Object.register_on(dispatcher)`
+## contract as the Phase 5 adapters so adding new categories is a pure
+## extension — no changes to the registration loop are required.
+func _register_phase6a_tools() -> void:
+	var factories: Array = [
+		["animation", animation_tools_factory],
+		["tilemap", tilemap_tools_factory],
+		["theme_ui", theme_ui_tools_factory],
+		["shader", shader_tools_factory],
+		["physics", physics_tools_factory],
+		["scene3d", scene3d_tools_factory],
+		["particle", particle_tools_factory],
+		["navigation", navigation_tools_factory],
+		["audio", audio_tools_factory],
+		["animation_tree", animation_tree_tools_factory],
+		["state_machine", state_machine_tools_factory],
+		["blend_tree", blend_tree_tools_factory],
+	]
+	for entry in factories:
+		var key: String = entry[0]
+		var factory: Callable = entry[1]
+		if not factory.is_valid():
+			continue
+		var adapter: Object = factory.call()
+		if adapter == null:
+			continue
+		adapter.register_on(_dispatcher)
+		_phase6a_tools[key] = adapter
 
 
 ## Stop every collaborator started by `enter_tree()`. No-op when the
@@ -109,6 +162,7 @@ func exit_tree() -> void:
 	_visualizer_tools = null
 	_asset_generator_tools = null
 	_healing_tools = null
+	_phase6a_tools.clear()
 	_dispatcher = null
 
 	if _http_server != null:
