@@ -28,7 +28,7 @@ in its README; see each project's documentation for the latest state.
 
 | Capability              | ForgeKit Core             | [godot-mcp-pro](https://github.com/sparklecom/godot-mcp-pro) | [tomyud1/godot-mcp](https://github.com/tomyud1/godot-mcp) | [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp) |
 | ----------------------- | ------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
-| Tool count              | ~215 (Full profile)       | ~150                                                       | ~120                                                      | ~90                                                               |
+| Tool count              | ~271 (Full profile)       | ~150                                                       | ~120                                                      | ~90                                                               |
 | Editor channel          | yes (WebSocket, 6010-6019) | yes                                                        | yes                                                       | no                                                                |
 | Runtime channel         | yes (UDP, 6020-6029)      | no                                                         | no                                                        | no                                                                |
 | CLI channel             | yes (spawn `godot --headless`) | yes                                                    | yes                                                       | yes                                                               |
@@ -188,7 +188,7 @@ forgekit-core/
 ├── mcp-server/                 # @forgekitstudio/core-mcp Node.js server (published to npm).
 ├── docs/                       # Architecture notes, MCP API reference, SKILLS pack.
 ├── tests/                      # GUT unit, property, integration, and static tests.
-├── tools/                      # CLI helpers (run_tests.sh, check_imports.sh).
+├── tools/                      # CLI helpers (run_tests.sh, check_imports.sh, run_check_imports.mjs).
 ├── .github/                    # Issue templates, PR template, CI workflows.
 ├── CLAUDE.md                   # Context file for AI agents.
 ├── .cursorrules                # Context file for Cursor (mirror of CLAUDE.md).
@@ -227,12 +227,23 @@ install.
 The MCP server exposes four tool profiles, selected with the `--profile`
 flag. Counts are approximate and shift with each minor release.
 
-| Profile    | Tool count | Intended clients                                             |
-| ---------- | ---------- | ------------------------------------------------------------ |
-| `Full`     | ~215       | Claude Code, Cline, VS Code Copilot, Cursor, Kiro            |
-| `Lite`     | ~90        | Windsurf, JetBrains Junie, Gemini CLI (~100-tool limits)     |
-| `Minimal`  | ~40        | OpenCode, local LLMs, Antigravity via stdio                  |
-| `RPG-only` | ~29 + core | Users focused on the RPG module after activating its license |
+| Profile    | Tool count  | Intended clients                                             |
+| ---------- | ----------- | ------------------------------------------------------------ |
+| `Full`     | ~271        | Claude Code, Cline, VS Code Copilot, Cursor, Kiro            |
+| `Lite`     | ~194        | Windsurf, JetBrains Junie, Gemini CLI (~100-tool limits)     |
+| `Minimal`  | ~21         | OpenCode, local LLMs, Antigravity via stdio                  |
+| `RPG-only` | ~77 + 21 core | Users focused on the RPG module after activating its license |
+
+`Full` includes every `scope: core` tool plus every module tool unlocked
+by an active license; the current surface covers the Phase 6A baseline
+of 215 tools across 34 categories and now ships additional runtime,
+workspace, and RPG-domain tools beyond it. `Lite` is the union of
+`core-minimal` and `core` tools. `Minimal` is only the `core-minimal`
+set (available in every profile). `RPG-only` is `core-minimal` plus the
+fifteen RPG subsystem categories (`combat`, `crafting`, `inventory`,
+`stats`, `effects`, `magic`, `equipment`, `progression`, `enemies`,
+`loot`, `spawner`, `chests`, `npc`, `dialog`, `vendor`), unlocked in one
+step by the `forgekit_rpg` license.
 
 ## Ports
 
@@ -514,6 +525,10 @@ file, even if the server is killed mid-write. This is what lets
 `preload("res://...")`, `load("res://...")`, and `extends "res://..."`
 target, and reports any file that crosses a module boundary. CI and the
 `tools/cli_runner/check_imports.sh` helper call the same implementation.
+`tools/run_check_imports.mjs` is a Node-only counterpart that imports
+`mcp-server/dist/src/tools/project/check_imports.js` directly and exits
+with code `1` when violations are found — handy for running the check
+locally after `npm run build` without spawning a shell pipeline.
 
 ### Parameters
 
