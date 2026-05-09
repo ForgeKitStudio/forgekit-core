@@ -361,6 +361,192 @@
       "scope": "module",
       "channel": "runtime",
       "module": "progression"
+    },
+    {
+      "name": "enemies.spawn",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.list_active",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.get_state",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.kill",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.list_resources",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.get_resource",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.create_resource",
+      "scope": "module",
+      "channel": "editor",
+      "module": "enemies"
+    },
+    {
+      "name": "loot.list_tables",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "loot.get_table",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "loot.roll",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "loot.simulate",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "spawner.start_wave",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.stop",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.get_state",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.list_waves",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.get_wave",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "chests.open",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "chests.close",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "chests.is_opened",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "chests.list_active",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "npc.list_npcs",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "npc"
+    },
+    {
+      "name": "npc.get_npc",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "npc"
+    },
+    {
+      "name": "dialog.start",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "dialog.select",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "dialog.list_dialogs",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "dialog.get_dialog",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "vendor.buy",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.sell",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.list_vendors",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.get_vendor",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.refresh_stock",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
     }
   ]
 }
