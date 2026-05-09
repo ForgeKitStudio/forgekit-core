@@ -10,9 +10,11 @@ const EXPECTED_SIGNALS: Array = [
 	"item_equipped",
 	"item_removed",
 	"item_unequipped",
+	"leveled_up",
 	"spell_cast",
 	"status_effect_expired",
 	"status_effect_ticked",
+	"xp_gained",
 ]
 
 
@@ -51,13 +53,15 @@ func after_each() -> void:
 	_received_spell_cast.clear()
 	_received_item_equipped.clear()
 	_received_item_unequipped.clear()
+	_received_xp_gained.clear()
+	_received_leveled_up.clear()
 
 
 func test_list_signals_returns_all_declared_signal_names() -> void:
 	var result: Variant = _bus().call("list_signals")
 	assert_true(result is Array, "list_signals must return an Array")
 	var names: Array = result
-	assert_eq(names.size(), 9, "Expected exactly nine declared global signals after phase 4B additions")
+	assert_eq(names.size(), 11, "Expected exactly eleven declared global signals after phase 5 additions")
 	for expected in EXPECTED_SIGNALS:
 		assert_true(names.has(expected), "Expected signal '%s' to be declared" % expected)
 
@@ -296,3 +300,87 @@ func test_item_unequipped_is_declared_and_validated() -> void:
 	)
 	assert_true(ok)
 	assert_eq(_received_item_unequipped.size(), 1)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 additions — XP and level-up events
+# ---------------------------------------------------------------------------
+
+var _received_xp_gained: Array = []
+var _received_leveled_up: Array = []
+
+
+func _on_xp_gained(owner: StringName, amount: float, source: StringName) -> void:
+	_received_xp_gained.append([owner, amount, source])
+
+
+func _on_leveled_up(owner: StringName, new_level: int, reward_tier: StringName) -> void:
+	_received_leveled_up.append([owner, new_level, reward_tier])
+
+
+func test_xp_gained_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("xp_gained"))
+
+	_bus().connect(&"xp_gained", Callable(self, "_on_xp_gained"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"xp_gained",
+		[StringName("hero"), 125.5, StringName("manual")]
+	)
+
+	assert_true(ok, "well-typed xp_gained must propagate")
+	assert_eq(_received_xp_gained.size(), 1)
+	if _received_xp_gained.size() == 1:
+		assert_eq(_received_xp_gained[0][0], StringName("hero"))
+		assert_eq(_received_xp_gained[0][1], 125.5)
+		assert_eq(_received_xp_gained[0][2], StringName("manual"))
+
+	_received_xp_gained.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"xp_gained",
+		[StringName("hero"), 125, StringName("manual")]  # amount must be float, int rejected
+	)
+	assert_false(bad, "xp_gained amount must be float; int must be rejected")
+	assert_eq(_received_xp_gained.size(), 0)
+	assert_push_error_count(1)
+
+
+func test_leveled_up_is_declared_and_validated() -> void:
+	assert_true(_bus().has_signal("leveled_up"))
+
+	_bus().connect(&"leveled_up", Callable(self, "_on_leveled_up"))
+
+	var ok: bool = _bus().call(
+		"emit_validated",
+		&"leveled_up",
+		[StringName("hero"), 5, StringName("warrior")]
+	)
+
+	assert_true(ok, "well-typed leveled_up must propagate")
+	assert_eq(_received_leveled_up.size(), 1)
+	if _received_leveled_up.size() == 1:
+		assert_eq(_received_leveled_up[0][0], StringName("hero"))
+		assert_eq(_received_leveled_up[0][1], 5)
+		assert_eq(_received_leveled_up[0][2], StringName("warrior"))
+
+	_received_leveled_up.clear()
+	# Empty reward_tier is valid when the level-up applied no reward.
+	var ok_empty: bool = _bus().call(
+		"emit_validated",
+		&"leveled_up",
+		[StringName("hero"), 6, StringName("")]
+	)
+	assert_true(ok_empty, "empty reward_tier StringName must be accepted")
+	assert_eq(_received_leveled_up.size(), 1)
+
+	_received_leveled_up.clear()
+	var bad: bool = _bus().call(
+		"emit_validated",
+		&"leveled_up",
+		[StringName("hero"), "5", StringName("")]  # new_level must be int, String rejected
+	)
+	assert_false(bad, "leveled_up new_level must be int; String must be rejected")
+	assert_eq(_received_leveled_up.size(), 0)
+	assert_push_error_count(1)
