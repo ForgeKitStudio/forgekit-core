@@ -32,6 +32,14 @@ concurrency:
   group: npm-publish-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  # The publish-npm sanity gate runs the full vitest suite, which
+  # includes property tests that shell out to the Godot binary
+  # (GDScript validator, input simulator, save-iff-valid). Pin the
+  # same Godot version `ci.yml` uses so the publish gate matches CI
+  # byte-for-byte.
+  GODOT_VERSION: "4.6.2"
+
 jobs:
   # -------------------------------------------------------------------------
   # Shared validation — mirrored from release.yml. Any change here must be
@@ -122,6 +130,26 @@ jobs:
       - name: Build MCP server
         working-directory: mcp-server
         run: npm run build
+
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        # Mirrors ci.yml — the property tests that shell out to
+        # `godot` in the sanity gate require the binary on $PATH. Pin
+        # to the same version ci.yml uses so the publish gate behaves
+        # identically.
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: false
+
+      - name: Pre-warm Godot global class cache
+        # `class_name` resolution for types like `GDScriptValidator`
+        # requires the global class cache. A fresh checkout has no
+        # `.godot/global_script_class_cache.cfg`, so `--editor --quit`
+        # once populates it before the sanity-gate property tests run
+        # their first `godot --headless --script` subprocess.
+        shell: bash
+        run: godot --headless --editor --quit --path .
 
       - name: Run test suite (sanity gate)
         working-directory: mcp-server
