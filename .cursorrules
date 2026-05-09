@@ -151,6 +151,15 @@ tree must come with a matching update to this section so the Context Commits
 hook accepts the commit. Per-tool documentation and transport details live
 in `docs/mcp_api.md`.
 
+The `ToolModule` union in `mcp-server/src/profiles.ts` enumerates every
+module id recognized by the profile filter. As of v0.7.0 it covers
+`core-minimal`, `core`, and the fifteen RPG subsystem modules (`combat`,
+`crafting`, `inventory`, `stats`, `effects`, `magic`, `equipment`,
+`progression`, `enemies`, `loot`, `spawner`, `chests`, `npc`, `dialog`,
+`vendor`). A single valid `forgekit_rpg.key` record unlocks all fifteen
+RPG modules (see `MODULE_ID_TO_UNLOCKED` in
+`mcp-server/src/licensing/startup.ts`).
+
 **`install-hooks` CLI path resolution**: `src/cli/install_hooks.ts` compiles
 to `dist/src/cli/install_hooks.js` (note the `src/` segment — tsc preserves
 the source tree layout when `rootDir` is the package root). The

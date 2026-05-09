@@ -5,9 +5,9 @@
  * `user://licenses/` directory, reads every `<module_id>.key` file, and
  * derives the set of tool modules that should be exposed beyond the
  * base profile. A single valid `forgekit_rpg.key` record unlocks the
- * eight RPG subsystems (combat, crafting, inventory, stats, effects,
- * magic, equipment, progression) in line with the licensing
- * acceptance criteria.
+ * fifteen RPG subsystems (combat, crafting, inventory, stats, effects,
+ * magic, equipment, progression, enemies, loot, spawner, chests, npc,
+ * dialog, vendor) in line with the licensing acceptance criteria.
  *
  * This module wraps the pure helpers in `./license_directory.ts` with
  * the filesystem I/O required to read the license records. All I/O is
@@ -137,6 +137,13 @@ const MODULE_ID_TO_UNLOCKED: Readonly<Record<string, ReadonlyArray<ToolModule>>>
       'magic',
       'equipment',
       'progression',
+      'enemies',
+      'loot',
+      'spawner',
+      'chests',
+      'npc',
+      'dialog',
+      'vendor',
     ],
   };
 
