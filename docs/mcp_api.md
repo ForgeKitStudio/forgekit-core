@@ -1,10 +1,14 @@
 # MCP API
 
 This document describes the tool surface exposed by
-`@forgekitstudio/core-mcp`. The v0.1 MVP shapes below are stable from that
-milestone onward; Phase 6A adds fourteen editor/CLI-channel tool
-categories that bring the full surface to 215 tools across 34
-categories, tracked in the design document.
+`@forgekitstudio/core-mcp`. The v0.1 MVP shapes below are stable from
+that milestone onward; Phase 6A adds fourteen editor/CLI-channel tool
+categories, bringing the baseline to 215 tools across 34 categories as
+tracked in the design document. The live `profiles.json` bundle ships
+every tool that has an implementation in the repository, so the
+current `Full` profile exposes ~271 tools; `Minimal` stays at 21
+(`core-minimal`), and the `forgekit_rpg` license unlocks ~77 additional
+tools across the fifteen RPG subsystem categories listed below.
 
 ## Tools by category
 

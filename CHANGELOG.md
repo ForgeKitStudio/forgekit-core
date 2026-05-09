@@ -10,6 +10,8 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-09
+
 ### Added
 
 - **Task 7 final validation gate:**
