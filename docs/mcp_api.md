@@ -1921,3 +1921,97 @@ calls return the existing instance).
 Histograms keep a rolling window of the most recent 1000 observations
 and report `{count, sum, p50, p95, p99}` via `snapshot()`, using the
 nearest-rank percentile rule (`index = ceil(p * n) - 1`).
+
+## Health endpoint
+
+Phase 6B adds a small HTTP server for operators and CI to query the
+live state of the MCP process without speaking JSON-RPC. The server
+binds the first free TCP port in the Health range (`6040-6049`) on
+`127.0.0.1` and writes the chosen port into
+`mcp_active_port.json` under the `"health"` key so the editor plugin
+and runtime bridge can discover it alongside the other channels.
+
+The implementation lives in `mcp-server/src/health_endpoint.ts`
+(class `HealthEndpoint`). All four routes are read-only and require
+no authentication; the server only binds loopback so exposing it
+outside the local machine is an explicit user action.
+
+### `GET /health`
+
+```
+200 OK
+Content-Type: application/json
+
+{
+  "status": "ok" | "degraded" | "down",
+  "checks": { "editor": "<status>", "runtime": "<status>", "cli": "<status>" }
+}
+```
+
+Per-channel rules (evaluated by `channelStatusProvider`):
+
+- `ok` — last heartbeat from that channel arrived inside the previous
+  10 seconds.
+- `degraded` — last heartbeat is older than 10 seconds but the
+  channel was connected at least once during the current session.
+- `down` — the channel never connected, or was explicitly stopped.
+
+The top-level `status` rolls up the three checks: `down` if any is
+`down`, `degraded` if any is `degraded`, otherwise `ok`.
+
+### `GET /metrics`
+
+```
+200 OK
+Content-Type: text/plain; version=0.0.4
+
+# HELP mcp_requests_total mcp.requests.total
+# TYPE mcp_requests_total counter
+mcp_requests_total 1234
+...
+# HELP mcp_requests_duration_ms mcp.requests.duration_ms
+# TYPE mcp_requests_duration_ms histogram
+mcp_requests_duration_ms_count 5000
+mcp_requests_duration_ms_sum 620000
+mcp_requests_duration_ms{quantile="0.5"} 90
+mcp_requests_duration_ms{quantile="0.95"} 240
+mcp_requests_duration_ms{quantile="0.99"} 480
+```
+
+Name translation replaces every non-`[a-zA-Z0-9_]` character with
+`_` so `mcp.requests.total` becomes `mcp_requests_total`; the
+original ForgeKit name is kept in the `# HELP` line so scrapers can
+surface the pre-sanitised identifier.
+
+### `GET /version`
+
+```
+200 OK
+Content-Type: application/json
+
+{
+  "server": "<npm version>",
+  "core_detected": "<git tag or 'unknown'>",
+  "api_version": "<same as server>"
+}
+```
+
+`core_detected` is resolved from `git describe --tags --abbrev=0` at
+the project root on every request. On failure (no git, no tags,
+error from the resolver) the field falls back to `"unknown"`.
+
+### `GET /trace/:trace_id`
+
+```
+200 OK
+Content-Type: application/json
+
+[
+  { "ts": "2026-05-15T12:00:00.000Z", "trace_id": "abcd1234", ... },
+  ...
+]
+```
+
+Reads every `<logsDir>/<YYYY-MM-DD>.jsonl` file for the last 7 days,
+keeps only lines whose `trace_id` matches the URL parameter, sorts
+them ascending by `ts`, and caps the response at 100 entries.

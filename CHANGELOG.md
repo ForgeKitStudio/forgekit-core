@@ -71,6 +71,21 @@ every published tag has a matching entry.
     but not automatically emitted — the editor `UndoRedoWrapper`
     has no stack-size signal to subscribe to. Wiring will land in a
     future pass when the wrapper exposes the needed observable.
+  - **Health endpoint HTTP server (Phase 6.19).**
+    `mcp-server/src/health_endpoint.ts` (class `HealthEndpoint`)
+    binds the first free port in `6040-6049` on `127.0.0.1` and
+    merges the chosen port into `mcp_active_port.json` under the
+    `"health"` key. Four read-only routes:
+    - `GET /health` — `{status, checks: {editor, runtime, cli}}`
+      with the `ok`/`degraded`/`down` roll-up.
+    - `GET /metrics` — Prometheus text format rendering the
+      canonical counter + histogram surface.
+    - `GET /version` — `{server, core_detected, api_version}`; the
+      `core_detected` field resolves from
+      `git describe --tags --abbrev=0` and falls back to `"unknown"`.
+    - `GET /trace/:trace_id` — the last 100 JSONL entries (across
+      the last 7 UTC days) matching the supplied `trace_id`, sorted
+      by `ts` ascending.
 
 ### Added (Phase 6A — previous sub-delivery)
 

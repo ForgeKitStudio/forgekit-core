@@ -278,6 +278,12 @@ Phase 6B adds three observability primitives on the server side.
   `mcp.editor_plugin.undo_stack_size` is declared but deferred from
   automatic wiring — the wrapper has no stack-size signal to
   subscribe to.
+- **Health endpoint.** `mcp-server/src/health_endpoint.ts` (class
+  `HealthEndpoint`) binds the first free port in `6040-6049` on
+  `127.0.0.1` and merges the chosen port into
+  `mcp_active_port.json` under the `"health"` key. Routes:
+  `GET /health`, `GET /metrics` (Prometheus text), `GET /version`,
+  `GET /trace/:trace_id` (up to 100 entries, last 7 days of logs).
 
 ## Git hooks
 

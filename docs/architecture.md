@@ -268,7 +268,10 @@ The canonical names are exported from
 `METRIC_REQUESTS_DURATION_MS` and the heartbeat / reconnect counters.
 The server's `MetricsRegistry` owns the actual `Counter` instances;
 downstream code obtains them by name through
-`registerCounter(name)`.
+`registerCounter(name)`. See
+[`mcp_api.md` &sect; Observability](mcp_api.md#observability) for the
+full metric inventory (including UDP packet, self-healing, and undo
+stack counters) and the histogram percentile contract.
 
 ### Godot side — `McpJsonRpcDispatcher`
 

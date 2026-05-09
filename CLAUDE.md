@@ -306,6 +306,21 @@ JSON-RPC request end-to-end, and an in-memory metrics registry.
   The `mcp.editor_plugin.undo_stack_size` gauge is declared but
   not yet wired — the `UndoRedoWrapper` has no stack-size signal to
   subscribe to, so the delta emission is deferred to a future pass.
+- **Health endpoint.** `mcp-server/src/health_endpoint.ts` (class
+  `HealthEndpoint`) binds the first free port in `6040-6049` on
+  `127.0.0.1` and merges the chosen port into `mcp_active_port.json`
+  under the `"health"` key. Four read-only routes:
+    - `GET /health` — `{status, checks: {editor, runtime, cli}}`.
+    - `GET /metrics` — Prometheus text rendering of the canonical
+      counter + histogram surface. Metric names with dots are
+      translated to underscores (`mcp.requests.total` →
+      `mcp_requests_total`).
+    - `GET /version` — `{server, core_detected, api_version}`;
+      `core_detected` resolves from `git describe --tags
+      --abbrev=0` at the project root and falls back to `"unknown"`.
+    - `GET /trace/:trace_id` — the last 100 JSONL entries matching
+      `trace_id`, scanning the last 7 days of log files and sorted
+      by `ts` ascending.
 
 ## Git hooks
 
