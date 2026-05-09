@@ -8,7 +8,7 @@ config_version=5
 
 config/name="ForgeKit Core Template"
 config/description="ForgeKit Core — modular AI-native starter kit for Godot 4.x"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.6", "Forward Plus")
 
 [autoload]
 

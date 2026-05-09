@@ -268,6 +268,15 @@ module id recognized by the profile filter. As of v0.7.0 it covers
 RPG modules (see `MODULE_ID_TO_UNLOCKED` in
 `mcp-server/src/licensing/startup.ts`).
 
+`project.check_imports` (`mcp-server/src/tools/project/check_imports.ts`)
+enforces the boundary rules statically. Rule 1.3 forbids cross-subsystem
+imports inside `addons/forgekit_rpg/`, but `public_api.gd` itself is the
+aggregator that re-exports every subsystem — it is therefore exempt from
+the rule and may import directly from every `forgekit_rpg/<subsystem>/`
+path. Every other file under `forgekit_rpg/<subsystem>/` that needs a
+peer subsystem must route the reference through
+`addons/forgekit_rpg/public_api.gd`.
+
 **`install-hooks` CLI path resolution**: `src/cli/install_hooks.ts` compiles
 to `dist/src/cli/install_hooks.js` (note the `src/` segment — tsc preserves
 the source tree layout when `rootDir` is the package root). The
