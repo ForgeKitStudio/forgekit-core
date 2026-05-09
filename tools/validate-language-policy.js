@@ -166,6 +166,28 @@ const SKIPPED_BASENAMES = new Set([
 ]);
 
 /**
+ * Paths that are skipped because they *must* contain non-English
+ * fixture strings to exercise the validator and related Unicode
+ * handling. Keep this list tight: every entry is a file whose purpose
+ * is to test behavior on Polish or other non-ASCII input, so scanning
+ * it would always produce false positives.
+ *
+ * The validator's own CLI (`tools/validate-language-policy.js`) is
+ * excluded because it hard-codes the Polish stopword list and
+ * diacritic class that the detector relies on.
+ *
+ * The report output `language-policy-violations.json` is excluded so
+ * the validator never flags the characters it just reported.
+ */
+const FIXTURE_PATH_ALLOWLIST = new Set([
+    'mcp-server/test/tools/testing/test_report.test.ts',
+    'mcp-server/test/type_parser.test.ts',
+    'mcp-server/test/validate_language_policy.test.ts',
+    'tools/validate-language-policy.js',
+    'language-policy-violations.json',
+]);
+
+/**
  * Normalise a filesystem path to forward-slash form so pattern checks
  * behave the same on POSIX and Windows CI runners.
  */
@@ -208,6 +230,10 @@ function isExcludedPath(relativePath) {
 
     const base = path.basename(posix);
     if (SKIPPED_BASENAMES.has(base)) {
+        return true;
+    }
+
+    if (FIXTURE_PATH_ALLOWLIST.has(posix)) {
         return true;
     }
 

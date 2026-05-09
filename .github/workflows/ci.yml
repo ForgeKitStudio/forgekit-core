@@ -30,7 +30,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GODOT_VERSION: "4.3.0"
+  # CI runs against Godot 4.6.2 to match forgekit-rpg. The Core module
+  # still supports Godot 4.3+ at the source level — 4.6.2 is the current
+  # CI target, not a new minimum on the consumer side.
+  GODOT_VERSION: "4.6.2"
 
 jobs:
   # -------------------------------------------------------------------------
@@ -141,22 +144,16 @@ jobs:
           use-dotnet: false
 
       - name: Run Gameplay Test Runner scenarios
-        # Phase 0: no scenarios exist under `tests/integration/scenes/` yet.
-        # Emit a placeholder green result. Once scenarios exist, iterate
-        # over each `.tscn` and run it through the MCP bridge runner; any
-        # non-zero exit fails the job.
-        #
-        # TODO(phase-1): replace the placeholder with the real scenario
-        # loop driven by `godot --headless --mcp-bridge --scene=<scenario>`.
+        # GUT-driven integration tests that load a scene fixture and
+        # assert the end-to-end flow through the public API. If no
+        # integration tests are present yet, emit a placeholder-green
+        # result so the required check still reports.
         shell: bash
         run: |
           set -euo pipefail
-          scenario_dir="tests/integration/scenes"
-          if [ -d "$scenario_dir" ] && compgen -G "$scenario_dir/*.tscn" > /dev/null; then
-            for scenario in "$scenario_dir"/*.tscn; do
-              echo "Running gameplay scenario: $scenario"
-              godot --headless --mcp-bridge --scene="$scenario"
-            done
+          scenario_dir="tests/integration"
+          if [ -d "$scenario_dir" ] && compgen -G "$scenario_dir/test_*.gd" > /dev/null; then
+            godot --headless --path . --script addons/gut/gut_cmdln.gd -gdir=res://tests/integration -gexit
           else
             echo "placeholder — gameplay scenarios not yet present (phase 0)"
           fi
