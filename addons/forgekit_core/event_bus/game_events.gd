@@ -62,6 +62,58 @@ signal xp_gained(owner: StringName, amount: float, source: StringName)
 signal leveled_up(owner: StringName, new_level: int, reward_tier: StringName)
 
 
+## Emitted when an entity's HP reaches zero (phase 6). `victim` is the
+## stringname id of the dead entity (an enemy id, a player id, or any
+## other owner tracked by the combat subsystem). `killer` is the
+## stringname id of the entity that landed the killing blow, or `&""`
+## for environmental, suicide, poison-tick, or other unowned deaths.
+## The RPG progression subsystem subscribes to this signal to award
+## XP to the killer when available.
+## Payload: victim (StringName), killer (StringName)
+signal died(victim: StringName, killer: StringName)
+
+## Emitted when a TreasureChest is opened and its loot has been rolled
+## (phase 6). Fires exactly once per chest instance even if the chest
+## is interacted with again afterwards; subsequent interactions are
+## no-ops.
+## Payload: chest_id (StringName), opener (StringName)
+signal chest_opened(chest_id: StringName, opener: StringName)
+
+## Emitted when a Door or Portal asks gameplay code to change the
+## active scene (phase 6). The event bus does not change scenes
+## itself; it merely announces the intent so gameplay code can drive
+## the actual `SceneTree.change_scene_to_file` and snap the player to
+## `target_spawn_point`.
+## Payload: from_scene (String), to_scene (String), target_spawn_point (StringName)
+signal scene_transition_requested(from_scene: String, to_scene: String, target_spawn_point: StringName)
+
+## Emitted when a DialogRunner begins a conversation (phase 6).
+## Payload: npc_id (StringName), dialog_tree_id (StringName)
+signal dialog_started(npc_id: StringName, dialog_tree_id: StringName)
+
+## Emitted when a DialogRunner ends a conversation (phase 6). `outcome`
+## is an optional StringName tag the dialog author can attach to the
+## terminal node (for example `&"quest_accepted"`, `&"refused"`); it is
+## `&""` when no outcome tag was set.
+## Payload: npc_id (StringName), dialog_tree_id (StringName), outcome (StringName)
+signal dialog_completed(npc_id: StringName, dialog_tree_id: StringName, outcome: StringName)
+
+## Emitted on every Vendor buy or sell operation (phase 6).
+## `transaction_type` is `&"buy"` or `&"sell"`. `currency_delta` is the
+## net change in currency on `actor`'s side: negative on buy (spent
+## gold), positive on sell (received gold).
+## Payload: actor (StringName), vendor_id (StringName), transaction_type (StringName),
+##          item_id (StringName), amount (int), currency_delta (int)
+signal shop_transaction(
+	actor: StringName,
+	vendor_id: StringName,
+	transaction_type: StringName,
+	item_id: StringName,
+	amount: int,
+	currency_delta: int
+)
+
+
 ## Schema: signal name -> ordered list of expected argument type names.
 ## Type names are human-readable strings reused in push_error messages.
 const _SIGNAL_SCHEMAS: Dictionary = {
@@ -76,6 +128,12 @@ const _SIGNAL_SCHEMAS: Dictionary = {
 	&"item_unequipped": ["StringName", "StringName", "StringName"],
 	&"xp_gained": ["StringName", "float", "StringName"],
 	&"leveled_up": ["StringName", "int", "StringName"],
+	&"died": ["StringName", "StringName"],
+	&"chest_opened": ["StringName", "StringName"],
+	&"scene_transition_requested": ["String", "String", "StringName"],
+	&"dialog_started": ["StringName", "StringName"],
+	&"dialog_completed": ["StringName", "StringName", "StringName"],
+	&"shop_transaction": ["StringName", "StringName", "StringName", "StringName", "int", "int"],
 }
 
 
@@ -121,6 +179,8 @@ func _matches_type(value: Variant, type_name: String) -> bool:
 			return typeof(value) == TYPE_INT
 		"float":
 			return typeof(value) == TYPE_FLOAT
+		"String":
+			return typeof(value) == TYPE_STRING
 		"StringName":
 			return typeof(value) == TYPE_STRING_NAME
 		"Array":
