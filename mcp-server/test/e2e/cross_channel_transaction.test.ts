@@ -115,6 +115,21 @@ function godotBinary(): string | null {
 }
 
 /**
+ * The runtime-bridge fixture's `addons/forgekit_rpg/` symlink points at
+ * a sibling `forgekit-rpg/` checkout. The paid module is private, so
+ * public lanes (CI on `forgekit-core` alone) only see the `.gitkeep`
+ * placeholder and `mcp_bridge_registrar.gd` parse-errors trying to
+ * preload `inventory_tools.gd`. This helper signals the rpg checkout
+ * is present so the suite can `describe.skipIf` itself out gracefully
+ * on public-only runs.
+ */
+function rpgFixtureInstalled(): boolean {
+    return existsSync(
+        join(RUNTIME_FIXTURE_DIR, 'addons', 'forgekit_rpg', 'inventory', 'inventory_tools.gd'),
+    );
+}
+
+/**
  * Resolve the Godot `user://` directory the spawned process will write
  * to. Each spawned child gets a private dir via `XDG_DATA_HOME` /
  * `APPDATA` / `HOME` overrides so editor and runtime processes do not
@@ -477,9 +492,11 @@ async function clearRuntimeInventory(client: RuntimeUdpClient): Promise<void> {
 
 const binary = godotBinary();
 // `describe.skipIf` matches the existing E2E pattern in this package.
-// When Godot is missing the entire suite is skipped so CI lanes that
-// cannot install the engine still pass green.
-const describeOrSkip = binary === null ? describe.skip : describe;
+// When Godot is missing, OR when the forgekit_rpg checkout is missing
+// (public-only CI), the entire suite is skipped so CI lanes that
+// cannot install the engine or the paid module still pass green.
+const describeOrSkip =
+    binary === null ? describe.skip : !rpgFixtureInstalled() ? describe.skip : describe;
 
 describeOrSkip('E2E — cross-channel transaction atomicity', () => {
     let harness: CrossChannelHarness;

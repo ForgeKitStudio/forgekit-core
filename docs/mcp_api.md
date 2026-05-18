@@ -253,6 +253,7 @@ ForgeKit application range (`-32000`..`-32099`):
 | Code     | Symbol                                   | Channel(s)              | Meaning |
 | -------- | ---------------------------------------- | ----------------------- | ------- |
 | `-32000` | `CHANNEL_UNAVAILABLE`                    | editor, runtime         | Editor or runtime client reported `isConnected() === false` at dispatch time. `data.suggestion` recommends checking `mcp.health` before retrying. |
+| `-32000` | `UNAUTHORIZED`                           | editor, runtime         | The configured `auth_token` is non-empty and the incoming request did not present a matching token (or omitted one entirely). The transport closes the connection after sending the envelope. `data.suggestion` points at rotating the token in `plugin_config.tres` / `runtime_config.tres`. Shares the numeric code with `CHANNEL_UNAVAILABLE`; disambiguated by `message`. |
 | `-32001` | `CHANNEL_TIMEOUT`                        | editor, runtime, cli, cross | Per-call timeout (default 30 000 ms) elapsed before the downstream channel replied. `data` carries `{channel, method, elapsed_ms}`. |
 | `-32002` | `PACKET_TOO_LARGE`                       | runtime (server-side)   | Server-side guard for outbound UDP datagrams above 65 507 bytes; reject before send. |
 | `-32003` | `UNDO_REDO_FAILED`                       | editor                  | `EditorUndoRedoManager` rejected the action (closed scene, race with a manual undo). |
@@ -2358,19 +2359,11 @@ Tip: grep the JSONL logs with `workspace_id=<id>` to get the full
 audit trail for a single workspace across the editor / runtime / CLI
 channels.
 
-The `/health` endpoint also exposes the workspace summary:
-
-```json
-{
-  "status": "ok",
-  "checks": {"editor": "ok", "runtime": "ok", "cli": "ok"},
-  "workspaces": {"count": 2, "active": "client-a"}
-}
-```
-
-The `workspaces` field is only present when the server was started
-with a ProjectRegistry dependency; pre-v0.9.0 health responses (no
-registry wired) continue to emit the two-field shape.
+The `/health` endpoint surfaces the same workspace summary on the
+top-level `workspaces` field of every response (see the v0.10.0
+shape in [Health endpoint](#health-endpoint) below). The field is
+always present in v0.10.0 — `{count: 0, active: null}` when the
+server was started without a ProjectRegistry dependency.
 
 ## Health endpoint
 
@@ -2394,11 +2387,32 @@ Content-Type: application/json
 
 {
   "status": "ok" | "degraded" | "down",
-  "checks": { "editor": "<status>", "runtime": "<status>", "cli": "<status>" }
+  "version": "<server npm version>",
+  "uptime_s": 1234,
+  "channels": {
+    "editor":  { "connected": true,  "port": 6010, "last_heartbeat_ms_ago": 4200 },
+    "runtime": { "connected": false, "port": null, "last_heartbeat_ms_ago": null }
+  },
+  "profile": "Full",
+  "unlocked_modules": ["forgekit_rpg"],
+  "workspaces": { "count": 1, "active": "default" }
 }
 ```
 
-Per-channel rules (evaluated by `channelStatusProvider`):
+`status` is the per-channel rollup: `down` if any of `editor` /
+`runtime` / `cli` is `down`, `degraded` if any is `degraded`,
+otherwise `ok`. `version` echoes the active server SemVer.
+`uptime_s` is wall-clock seconds since `HealthEndpoint.start()`,
+floored to a whole second. The `channels` object reports per-transport
+detail: `connected` flips `true` once the editor WebSocket or runtime
+UDP transport completes its first handshake; `port` is the bound port
+from `mcp_active_port.json`; `last_heartbeat_ms_ago` is the elapsed
+time since the most recent heartbeat (`null` until a heartbeat is
+seen). `profile` is the active CLI profile (`Full`, `Lite`, `Minimal`,
+or `RPG-only`); `unlocked_modules` is the license-derived list of
+module ids unlocked beyond the base profile.
+
+Per-channel rollup rules (evaluated by `channelStatusProvider`):
 
 - `ok` — last heartbeat from that channel arrived inside the previous
   10 seconds.
@@ -2406,32 +2420,35 @@ Per-channel rules (evaluated by `channelStatusProvider`):
   channel was connected at least once during the current session.
 - `down` — the channel never connected, or was explicitly stopped.
 
-The top-level `status` rolls up the three checks: `down` if any is
-`down`, `degraded` if any is `degraded`, otherwise `ok`.
+The `workspaces` field is always present in v0.10.0; it reports
+`{count: 0, active: null}` when the server was started without a
+ProjectRegistry dependency.
 
 ### `GET /metrics`
 
 ```
 200 OK
-Content-Type: text/plain; version=0.0.4
+Content-Type: application/json
 
-# HELP mcp_requests_total mcp.requests.total
-# TYPE mcp_requests_total counter
-mcp_requests_total 1234
-...
-# HELP mcp_requests_duration_ms mcp.requests.duration_ms
-# TYPE mcp_requests_duration_ms histogram
-mcp_requests_duration_ms_count 5000
-mcp_requests_duration_ms_sum 620000
-mcp_requests_duration_ms{quantile="0.5"} 90
-mcp_requests_duration_ms{quantile="0.95"} 240
-mcp_requests_duration_ms{quantile="0.99"} 480
+{
+  "requests_total": 1234,
+  "requests_by_method": {},
+  "errors_total": 7,
+  "errors_by_code": {},
+  "dispatch_latency_p50_ms": 1,
+  "dispatch_latency_p99_ms": 2
+}
 ```
 
-Name translation replaces every non-`[a-zA-Z0-9_]` character with
-`_` so `mcp.requests.total` becomes `mcp_requests_total`; the
-original ForgeKit name is kept in the `# HELP` line so scrapers can
-surface the pre-sanitised identifier.
+Cumulative JSON snapshot derived from the in-process
+`MetricsRegistry`. `requests_total` and `errors_total` are pulled
+from the canonical counters `mcp.requests.total` and
+`mcp.requests.errors`. `dispatch_latency_p50_ms` and
+`dispatch_latency_p99_ms` come from the `mcp.requests.duration_ms`
+histogram (rolling window of 1000 observations, nearest-rank
+percentile rule); both are `0` until the first dispatch is observed.
+`requests_by_method` and `errors_by_code` are reserved for future
+per-method / per-code breakdowns and currently emit `{}`.
 
 ### `GET /version`
 
@@ -2440,15 +2457,25 @@ surface the pre-sanitised identifier.
 Content-Type: application/json
 
 {
-  "server": "<npm version>",
-  "core_detected": "<git tag or 'unknown'>",
-  "api_version": "<same as server>"
+  "version": "<server npm version>",
+  "api_version": "<server npm version>",
+  "sdk_version": "<@modelcontextprotocol/sdk version or 'unknown'>",
+  "godot_compat": ["4.6"],
+  "schemas_count": 271,
+  "core_detected": "<git tag or 'unknown'>"
 }
 ```
 
-`core_detected` is resolved from `git describe --tags --abbrev=0` at
-the project root on every request. On failure (no git, no tags,
-error from the resolver) the field falls back to `"unknown"`.
+`version` and `api_version` mirror the active `@forgekitstudio/core-mcp`
+package version (`api_version` defaults to `version` when not
+overridden at boot). `sdk_version` reports the bundled MCP TypeScript
+SDK release; `"unknown"` when the value was not supplied at boot.
+`godot_compat` is the list of Godot major / minor releases the server
+declares compatibility with. `schemas_count` is the number of input
+schemas registered by the server (one per tool advertised through
+`tools/list`). `core_detected` is resolved from
+`git describe --tags --abbrev=0` at the project root on every request
+and falls back to `"unknown"` on failure.
 
 ### `GET /trace/:trace_id`
 

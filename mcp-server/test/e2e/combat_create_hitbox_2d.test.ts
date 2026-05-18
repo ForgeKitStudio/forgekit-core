@@ -18,7 +18,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -58,6 +58,40 @@ function godotBinary(): string {
         return fromEnv;
     }
     return 'godot';
+}
+
+/**
+ * The runtime-bridge fixture's `addons/forgekit_rpg/` symlink points at
+ * a sibling `forgekit-rpg/` checkout. The paid module is private, so
+ * public lanes (CI on `forgekit-core` alone) only see the `.gitkeep`
+ * placeholder — the fixture's `mcp_bridge_registrar.gd` then fails to
+ * preload `combat_tools.gd` and the autoload never registers, leaving
+ * the port file unwritten. This helper signals the rpg checkout is
+ * present so the suite can `describe.skipIf` itself out gracefully on
+ * public-only runs (mirroring the GUT integration suites that
+ * `pending("forgekit_rpg module not installed")`).
+ */
+function rpgFixtureInstalled(): boolean {
+    const target = join(
+        FIXTURE_PROJECT_DIR,
+        'addons',
+        'forgekit_rpg',
+        'combat',
+        'combat_tools.gd',
+    );
+    if (!existsSync(target)) {
+        return false;
+    }
+    // `existsSync` follows symlinks, so a chain that ultimately
+    // resolves to a real file passes. Also confirm the file is a
+    // regular file via `statSync` so a directory entry that does not
+    // resolve to a regular file (e.g. a placeholder where the symlink
+    // dangles into a fresh checkout) is rejected.
+    try {
+        return statSync(target).isFile();
+    } catch {
+        return false;
+    }
 }
 
 /**
@@ -237,7 +271,20 @@ function callWithTimeout<T>(promise: Promise<T>, ms: number, label: string): Pro
     });
 }
 
-describe('E2E — combat.create_hitbox round trip via runtime UDP bridge', () => {
+// Skip the entire suite when:
+//   1. No Godot binary is available (matches the convention used by
+//      every other E2E test in this directory).
+//   2. The forgekit_rpg checkout is missing (public-only CI). The
+//      fixture's autoload preloads RPG tool scripts; when the symlink
+//      dangles the registrar parse-errors and the bridge never starts.
+const describeOrSkip =
+    process.env.GODOT_BIN === undefined && !existsSync('/opt/homebrew/bin/godot')
+        ? describe.skip
+        : !rpgFixtureInstalled()
+            ? describe.skip
+            : describe;
+
+describeOrSkip('E2E — combat.create_hitbox round trip via runtime UDP bridge', () => {
     let bridge: RuntimeBridge;
 
     beforeAll(async () => {
@@ -245,7 +292,9 @@ describe('E2E — combat.create_hitbox round trip via runtime UDP bridge', () =>
     }, 60_000);
 
     afterAll(async () => {
-        await bridge.teardown();
+        if (bridge !== undefined) {
+            await bridge.teardown();
+        }
     });
 
     it('creates a Hitbox2D node when dimension is "2d"', async () => {
