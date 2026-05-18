@@ -48,6 +48,14 @@ var level: StringName = &"info"
 # Callable returning an ISO-8601 UTC timestamp as a `String`.
 var clock: Callable = Callable()
 
+# Bound trace context propagated onto every subsequent `log()` call
+# unless the caller passes explicit `trace_id` / `span_id` in the per
+# line `data` payload. Empty strings mean "no binding" and the logger
+# will not emit `trace_id` / `span_id` fields unless the caller supplies
+# them per call. Configured through `set_trace_context()`.
+var _bound_trace_id: String = ""
+var _bound_span_id: String = ""
+
 
 func _init() -> void:
 	# Apply environment-variable override once at construction time so
@@ -70,6 +78,18 @@ func _init() -> void:
 		return base + "Z"
 
 
+## Bind a trace context that is automatically attached to every
+## subsequent `log()` call, mirroring the way the server-side
+## `DispatchLoggerMiddleware` injects `params.trace` into the JSON-RPC
+## envelope. Per-call `trace_id` / `span_id` keys in the `data`
+## payload still win — this only fills the gap when the caller did not
+## thread the trace through manually. Pass empty strings to clear the
+## binding.
+func set_trace_context(trace_id: String, span_id: String) -> void:
+	_bound_trace_id = trace_id
+	_bound_span_id = span_id
+
+
 ## Emit a single structured log line.
 ##
 ## `component` is the caller-supplied logical source name
@@ -79,6 +99,16 @@ func log(line_level: StringName, component: StringName, data: Dictionary) -> voi
 	if not _passes_threshold(line_level):
 		return
 
+	# Inherit the bound trace context for keys the caller did not set.
+	# A non-empty bound id is only attached when the per-call payload
+	# did not already declare its own value, so explicit fields keep
+	# winning.
+	var enriched: Dictionary = data.duplicate()
+	if _bound_trace_id != "" and not enriched.has("trace_id"):
+		enriched["trace_id"] = _bound_trace_id
+	if _bound_span_id != "" and not enriched.has("span_id"):
+		enriched["span_id"] = _bound_span_id
+
 	var ts: String = String(clock.call())
 	var entry: Dictionary = {
 		"ts": ts,
@@ -87,14 +117,14 @@ func log(line_level: StringName, component: StringName, data: Dictionary) -> voi
 	}
 
 	for key in _RESERVED_FIELDS:
-		if data.has(key):
-			entry[key] = data[key]
+		if enriched.has(key):
+			entry[key] = enriched[key]
 
 	var remainder: Dictionary = {}
-	for key in data.keys():
+	for key in enriched.keys():
 		if key in _RESERVED_FIELDS:
 			continue
-		remainder[key] = data[key]
+		remainder[key] = enriched[key]
 	if not remainder.is_empty():
 		entry["data"] = remainder
 

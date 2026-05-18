@@ -14,8 +14,25 @@ import { parseTestReport } from './test_report.js';
 
 const MAX_STDERR_CHARS = 4096;
 
+/** Sentinel markers emitted by `gut_to_test_report_hook.gd`. */
+const REPORT_BEGIN_SENTINEL = '##FORGEKIT_TEST_REPORT_BEGIN##';
+const REPORT_END_SENTINEL = '##FORGEKIT_TEST_REPORT_END##';
+
 /** Returns the first TestReport found on any line of `stdout`, or null. */
 export function extractReportFromStdout(stdout: string): TestReport | null {
+  // Prefer the sentinel-wrapped block emitted by the GUT post-run hook
+  // (`addons/forgekit_core/testing/gut_to_test_report_hook.gd`). The
+  // sentinels make extraction robust even when other JSON-shaped
+  // diagnostics appear earlier in the GUT log.
+  const sentinel = extractBetweenSentinels(stdout);
+  if (sentinel !== null) {
+    try {
+      return parseTestReport(sentinel);
+    } catch {
+      // Fall through to the line-scan fallback below.
+    }
+  }
+
   // Iterate from the last line so a noisy GUT run still yields the final
   // report. `parseTestReport` throws for non-reports; catch and keep going.
   const lines = stdout.split(/\r?\n/).filter((l) => l.trim() !== '');
@@ -29,6 +46,20 @@ export function extractReportFromStdout(stdout: string): TestReport | null {
     }
   }
   return null;
+}
+
+/**
+ * Extracts the JSON body wrapped between
+ * `##FORGEKIT_TEST_REPORT_BEGIN##` / `##FORGEKIT_TEST_REPORT_END##`.
+ * Returns the trimmed body or `null` when either sentinel is missing.
+ */
+function extractBetweenSentinels(stdout: string): string | null {
+  const begin = stdout.indexOf(REPORT_BEGIN_SENTINEL);
+  if (begin === -1) return null;
+  const after = begin + REPORT_BEGIN_SENTINEL.length;
+  const end = stdout.indexOf(REPORT_END_SENTINEL, after);
+  if (end === -1) return null;
+  return stdout.slice(after, end).trim();
 }
 
 /**

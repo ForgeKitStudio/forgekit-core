@@ -20,6 +20,8 @@ describe('parseCliArgs — regression (existing behaviour)', () => {
       stdio: false,
       profile: 'Full',
       logLevel: 'info',
+      licenseDir: undefined,
+      smoke: false,
     });
   });
 
@@ -55,7 +57,9 @@ describe('main — install-hooks routing', () => {
       return 0;
     };
 
-    const exitCode = await main([], {
+    // `--smoke` keeps `main` from blocking on the shutdown signal
+    // that headless mode would otherwise wait on.
+    const exitCode = await main(['--smoke'], {
       installHooksHandler: fakeHandler,
     });
 
@@ -88,7 +92,7 @@ describe('runInstallHooks — resolves git dir and calls installer', () => {
         commitMsgTarget: '/node_modules/@forgekitstudio/core-mcp/dist/scripts/git-hooks/commit-msg.js',
         preCommitTarget: '/node_modules/@forgekitstudio/core-mcp/dist/scripts/git-hooks/pre-commit.js',
       }),
-      writeStderr: () => {},
+      writeStderr: () => { },
     };
 
     const code = await runInstallHooks([], deps);

@@ -1,7 +1,7 @@
 {
     "name": "@forgekitstudio/core-mcp",
-    "version": "0.9.2",
-    "description": "ForgeKit Core MCP Server — bridges LLM clients to the Godot 4.x editor plugin and runtime bridge. Phase 0 skeleton; full tool surface is populated in Phase 1.",
+    "version": "0.10.0",
+    "description": "Phase 1 transport active. Bridges LLM clients to the Godot 4.x editor plugin and runtime bridge over stdio MCP, WebSocket, UDP, with 271 tools across 34 categories.",
     "license": "MIT",
     "type": "module",
     "bin": {
@@ -18,12 +18,15 @@
     "scripts": {
         "build": "tsc -p tsconfig.scripts.json",
         "typecheck": "tsc --noEmit -p tsconfig.scripts.json",
+        "lint:errors": "tsc -p tsconfig.scripts.json && node dist/scripts/validate-error-codes.js",
         "pretest": "npm run build",
         "test": "vitest run",
         "test:watch": "vitest",
         "start": "node dist/src/index.js"
     },
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "ajv": "^8.20.0",
         "ws": "^8.18.0"
     },
     "devDependencies": {

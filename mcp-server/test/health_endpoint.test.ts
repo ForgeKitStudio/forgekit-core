@@ -141,11 +141,13 @@ describe('HealthEndpoint — GET /health', () => {
     const url = `http://127.0.0.1:${env.server.getPort()}/health`;
     const { status, body } = await fetchJson(url);
     expect(status).toBe(200);
-    expect((body as Record<string, unknown>).status).toBe('ok');
-    expect((body as Record<string, unknown>).checks).toEqual({
-      editor: 'ok',
-      runtime: 'ok',
-      cli: 'ok',
+    const b = body as Record<string, unknown>;
+    expect(b.status).toBe('ok');
+    // v0.10 schema replaces the legacy `checks` map with structured
+    // `channels.{editor, runtime}` entries; `cli` rolls into `status`.
+    expect(b.channels).toEqual({
+      editor: { connected: false, port: null, last_heartbeat_ms_ago: null },
+      runtime: { connected: false, port: null, last_heartbeat_ms_ago: null },
     });
   });
 
@@ -191,7 +193,7 @@ describe('HealthEndpoint — GET /health', () => {
 });
 
 describe('HealthEndpoint — GET /metrics', () => {
-  it('renders counter and histogram values in Prometheus text format', async () => {
+  it('renders counter and histogram values as JSON cumulative stats', async () => {
     const metrics = new MetricsRegistry();
     metrics.registerCounter('mcp.requests.total').inc(42);
     metrics.registerCounter('mcp.requests.errors').inc(3);
@@ -211,19 +213,18 @@ describe('HealthEndpoint — GET /metrics', () => {
     await env.server.start();
 
     const url = `http://127.0.0.1:${env.server.getPort()}/metrics`;
-    const { status, body } = await fetchText(url);
+    const { status, body } = await fetchJson(url);
     expect(status).toBe(200);
-    // Counters.
-    expect(body).toContain('# TYPE mcp_requests_total counter');
-    expect(body).toContain('mcp_requests_total 42');
-    expect(body).toContain('mcp_requests_errors 3');
-    // Histograms have both sum / count and quantile lines.
-    expect(body).toContain('# TYPE mcp_requests_duration_ms histogram');
-    expect(body).toContain('mcp_requests_duration_ms_count 100');
-    expect(body).toContain('mcp_requests_duration_ms_sum 5050');
-    expect(body).toContain('mcp_requests_duration_ms{quantile="0.5"} 50');
-    expect(body).toContain('mcp_requests_duration_ms{quantile="0.95"} 95');
-    expect(body).toContain('mcp_requests_duration_ms{quantile="0.99"} 99');
+    const b = body as Record<string, unknown>;
+    // v0.10 emits JSON cumulative stats; per-method/per-code maps are
+    // empty until the dispatcher tags its requests, but the counters
+    // and histogram percentiles are derived from the registry.
+    expect(b.requests_total).toBe(42);
+    expect(b.errors_total).toBe(3);
+    expect(b.requests_by_method).toEqual({});
+    expect(b.errors_by_code).toEqual({});
+    expect(b.dispatch_latency_p50_ms).toBe(50);
+    expect(b.dispatch_latency_p99_ms).toBe(99);
   });
 });
 
@@ -240,11 +241,12 @@ describe('HealthEndpoint — GET /version', () => {
     await env.server.start();
 
     const { body } = await fetchJson(`http://127.0.0.1:${env.server.getPort()}/version`);
-    expect(body).toEqual({
-      server: '0.7.0',
-      core_detected: 'v0.7.0',
-      api_version: '0.7.0',
-    });
+    const b = body as Record<string, unknown>;
+    // v0.10 schema: `version` replaces the legacy `server` key, with
+    // `core_detected` and `api_version` preserved for back-compat.
+    expect(b.version).toBe('0.7.0');
+    expect(b.api_version).toBe('0.7.0');
+    expect(b.core_detected).toBe('v0.7.0');
   });
 
   it('falls back to "unknown" when the core resolver fails', async () => {
@@ -407,7 +409,7 @@ describe('HealthEndpoint — GET /health with workspaces field (Phase 7)', () =>
     expect(b.workspaces).toEqual({ count: 0, active: null });
   });
 
-  it('omits the workspaces field when no registry is injected (backwards compat)', async () => {
+  it('emits an empty workspaces stub when no registry is injected', async () => {
     env.server = new HealthEndpoint({
       metrics: new MetricsRegistry(),
       activePortFilePath: env.activePortFile,
@@ -422,7 +424,9 @@ describe('HealthEndpoint — GET /health with workspaces field (Phase 7)', () =>
       `http://127.0.0.1:${env.server.getPort()}/health`,
     );
     const b = body as Record<string, unknown>;
-    expect(b.workspaces).toBeUndefined();
+    // v0.10 always emits a workspaces stub; pre-v0.10 callers tolerate
+    // the extra field because their parsers are JSON-additive.
+    expect(b.workspaces).toEqual({ count: 0, active: null });
   });
 });
 

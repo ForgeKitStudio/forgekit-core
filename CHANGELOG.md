@@ -10,6 +10,107 @@ every published tag has a matching entry.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-17
+
+### Added
+
+- **Phase 1 transport activation.** `npx -y @forgekitstudio/core-mcp --stdio`
+  now opens the actual MCP server over stdio instead of exiting with the
+  Phase 0 skeleton banner. The server speaks JSON-RPC 2.0 framed by
+  Content-Length headers per the MCP specification, advertises the full
+  271-tool surface from `profiles.json` via `tools/list`, and dispatches
+  `tools/call` to the editor / runtime / cli channel routers. The Godot
+  editor plugin (WebSocket on 6010–6019) and runtime bridge (UDP on
+  6020–6029) remain available simultaneously, so a single server process
+  bridges editor automation, runtime gameplay, and headless CLI from one
+  stdio handshake.
+- **Channel router.** `mcp-server/src/dispatcher/` resolves every
+  `tools/call` to the correct backend channel (`editor`, `runtime`,
+  `cli`, `cross`) based on the `channel` attribute in `profiles.json`,
+  then forwards the request through the matching transport. Cross-channel
+  transactions (`transaction.begin` / `transaction.commit`) atomically
+  group editor + runtime mutations and roll back on partial failure.
+- **MCP SDK integration.** `mcp-server/src/server/` and
+  `mcp-server/src/transports/` adopt the official Model Context Protocol
+  TypeScript SDK transport contracts so Claude Desktop, Cursor, Kiro,
+  and Antigravity can connect with their stock stdio configuration.
+- **271 input schemas.** `mcp-server/src/schema/` ships a JSON Schema
+  for every entry in `profiles.json`. The new
+  `mcp-server/scripts/ci/validate-schemas.ts` script fails CI when a
+  tool is missing a schema or its schema fails to compile.
+- **6 E2E tests.** `mcp-server/test/e2e/` covers the end-to-end MCP
+  pipeline: stdio handshake (`tools/list`), editor channel scene
+  manipulation, runtime channel inventory mutation, CLI channel headless
+  unit-test execution, cross-channel transaction atomicity, and auth
+  token enforcement against a live Godot editor instance.
+- **4 properties.** `mcp-server/test/property/` adds Properties 52–55
+  pinning trace propagation across channels, dispatcher determinism,
+  schema completeness, and cross-channel transaction atomicity, each at
+  ≥ 100 iterations.
+- **`docs/SKILLS/connecting_mcp_clients.md`.** New SKILL pack walking
+  agents through `tools/list` → `tools/call` against each of the 271
+  tools with example outputs and per-client stdio configuration blocks.
+
+### Changed
+
+- **BREAKING: `--stdio` mode now opens the actual MCP server vs.
+  exiting.** Pre-0.10.0 builds shipped a Phase 0 skeleton that printed a
+  banner and exited 0; 0.10.0 keeps the process alive and answers
+  `tools/list` and `tools/call` over stdio per MCP. Any harness that
+  asserted the v0.9.x exit-on-launch behaviour will hang waiting for the
+  request loop. Migrate to issuing JSON-RPC requests on stdin or pass
+  `--phase0-skeleton` on a pinned 0.9.x install if the legacy banner is
+  still required.
+- **BREAKING: Godot plugin auth enforced when token configured.** When
+  `auth_token` is non-empty in the editor plugin config or the runtime
+  bridge UDP packet header, the server now rejects clients that do not
+  present a matching token with `-32008 AUTH_FAILED` instead of
+  accepting the request and emitting a warning. Empty / unset tokens
+  retain the v0.9.x permissive behaviour for local development.
+- **`mcp-server/package.json` description.** Updated from "Phase 0
+  skeleton" to "Phase 1 transport active. Bridges LLM clients to the
+  Godot 4.x editor plugin and runtime bridge over stdio MCP, WebSocket,
+  UDP, with 271 tools across 34 categories." so the npm registry
+  reflects the actual capability surface.
+
+### Documentation
+
+- **`docs/mcp_api.md`.** New "Connecting to ForgeKit MCP Server" section
+  with stdio configuration blocks for Claude Desktop, Cursor, Kiro, and
+  Antigravity. New "Channel routing" section with the
+  `editor | runtime | cli | cross` table and worked examples. New
+  "Error codes" section pinning every entry in `error_codes.ts`.
+- **`docs/SKILLS/connecting_mcp_clients.md`.** SKILL pack covering the
+  `tools/list` → `tools/call` flow per client.
+- **`README.md`.** Quickstart now leads with
+  `npx -y @forgekitstudio/core-mcp --stdio` and includes a working
+  `claude_desktop_config.json` snippet plus the expected `tools/list`
+  response.
+- **`CLAUDE.md` and `.cursorrules`.** New `mcp-transport` anchor
+  documenting the stdio + headless server behaviour.
+
+### Migration notes
+
+- **Upgrading from 0.9.x to 0.10.0:**
+  1. Reinstall the npm package: `npx -y @forgekitstudio/core-mcp@latest`.
+     The package name (`@forgekitstudio/core-mcp`) and the global binary
+     name (`forgekit-mcp`) are unchanged.
+  2. Update the addon: replace `addons/forgekit_core/` with the
+     `0.10.0` archive from the GitHub Release. `plugin.cfg` now reports
+     `version = "0.10.0"`.
+  3. Update MCP client configs to invoke the server over stdio. The
+     argument shape stays the same (`npx -y @forgekitstudio/core-mcp
+     --stdio`), but the server no longer exits immediately, so any
+     wrapper that relied on that exit must be removed.
+  4. If `auth_token` is configured for the editor plugin or runtime
+     bridge, every connecting client must now present the matching
+     token. Audit existing clients before upgrading and either provide
+     the token or unset `auth_token` for local development.
+  5. No `profiles.json` entry from 0.9.x has been removed or had its
+     `name` / `channel` / `scope` / `module` retyped, and no error code
+     in the `-32004`..`-32022` range has changed semantics. Existing
+     `tools/call` payloads continue to work without modification.
+
 ## [0.9.2] - 2026-05-09
 
 ### Changed

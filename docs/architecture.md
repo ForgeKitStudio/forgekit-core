@@ -100,6 +100,17 @@ the right channel per tool.
   wires the WebSocket server (no dispatcher, no adapter factories)
   still starts and stops cleanly — the adapter registration is a pure
   extension.
+- **Receive loop.** The dispatcher is attached to the server through
+  `McpWebSocketServer.set_dispatcher(dispatcher)`, where `dispatcher`
+  exposes `dispatch(raw) -> Dictionary`. The owning plugin pumps the
+  loop once per editor frame via `McpWebSocketServer.poll()`, which
+  accepts pending TCP connections, promotes each to a `WebSocketPeer`
+  through `accept_stream()`, drains the buffered text frames from
+  every connected peer, and writes the dispatcher's JSON-RPC reply
+  back on the originating peer. Notifications (empty-dictionary
+  responses, i.e. JSON-RPC requests without an `id`) produce no
+  reply. Passing `null` to `set_dispatcher` detaches the dispatcher
+  cleanly during teardown.
 
 ### 2. CLI headless — spawn `godot --headless`
 

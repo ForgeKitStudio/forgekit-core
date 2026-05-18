@@ -56,6 +56,7 @@ export async function runUnit(
     '--script',
     'addons/gut/gut_cmdln.gd',
     `-gdir=${path}`,
+    '-gpost_run_script=res://addons/forgekit_core/testing/gut_to_test_report_hook.gd',
     '-gexit',
   ];
   if (params.pattern !== undefined) {

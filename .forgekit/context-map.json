@@ -66,6 +66,20 @@
       ]
     },
     {
+      "pattern": "mcp-server/src/index.ts",
+      "anchors": [
+        "CLAUDE.md#mcp-transport",
+        ".cursorrules#mcp-transport"
+      ]
+    },
+    {
+      "pattern": "mcp-server/src/stdio_bridge.ts",
+      "anchors": [
+        "CLAUDE.md#mcp-transport",
+        ".cursorrules#mcp-transport"
+      ]
+    },
+    {
       "pattern": "mcp-server/scripts/git-hooks/**/*.ts",
       "anchors": [
         "CLAUDE.md#git-hooks",

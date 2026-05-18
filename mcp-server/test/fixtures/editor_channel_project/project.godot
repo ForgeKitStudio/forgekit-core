@@ -1,0 +1,27 @@
+; ForgeKit MCP editor-channel E2E fixture project.
+;
+; Loaded by `mcp-server/test/e2e/editor_scene_open_save.test.ts`
+; to spawn a real Godot 4.6 instance with `--editor --headless`.
+; The forgekit_core addon is brought in via a relative symlink
+; under `addons/` so the test always exercises the live workspace
+; rather than a vendored copy. The `editor_plugins` section enables
+; the addon so the editor plugin's WebSocket server starts on
+; activation and the editor-channel JSON-RPC dispatcher becomes
+; reachable from the MCP server.
+
+config_version=5
+
+[application]
+
+config/name="ForgeKit MCP Editor Channel E2E"
+config/description="Test fixture for the editor-channel WebSocket transport."
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/forgekit_core/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="gl_compatibility"

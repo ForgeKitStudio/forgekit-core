@@ -1,0 +1,31 @@
+; ForgeKit MCP runtime-bridge E2E fixture project.
+;
+; Loaded by `mcp-server/test/e2e/combat_create_hitbox_2d.test.ts` to
+; spawn a real Godot 4.6 headless instance with `--mcp-bridge`. The
+; project keeps its dependencies minimal: ForgeKit Core and ForgeKit
+; RPG are brought in via relative symlinks under `addons/` so the
+; test always exercises the live workspace, not a vendored copy.
+
+config_version=5
+
+[application]
+
+config/name="ForgeKit MCP Runtime Bridge E2E"
+config/description="Test fixture for the runtime-channel UDP receive loop."
+config/features=PackedStringArray("4.3", "Forward Plus")
+run/main_scene="res://main.tscn"
+
+[autoload]
+
+GameEvents="*res://addons/forgekit_core/event_bus/game_events.gd"
+McpBridge="*res://addons/forgekit_core/mcp/runtime_bridge/mcp_bridge.gd"
+McpBridgeRegistrar="*res://mcp_bridge_registrar.gd"
+
+[debug]
+
+combat_debug_draw=false
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="gl_compatibility"

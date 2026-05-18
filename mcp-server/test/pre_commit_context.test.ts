@@ -82,6 +82,27 @@ describe('findRequiredAnchors', () => {
 });
 
 describe('anchorWasTouched', () => {
+  const fileText = [
+    '# Title',           // line 1
+    '',                  // line 2
+    'preamble line 3',   // line 3
+    'preamble line 4',   // line 4
+    'preamble line 5',   // line 5
+    'preamble line 6',   // line 6
+    'preamble line 7',   // line 7
+    'preamble line 8',   // line 8
+    'preamble line 9',   // line 9
+    '## event-bus',      // line 10
+    'event-bus line 11', // line 11
+    'event-bus line 12', // line 12
+    'event-bus line 13', // line 13
+    'event-bus line 14', // line 14
+    '## resources',      // line 15
+    'resources line 16', // line 16
+    'resources line 17', // line 17
+    'resources line 18', // line 18
+  ].join('\n');
+
   const diffText = [
     'diff --git a/CLAUDE.md b/CLAUDE.md',
     '--- a/CLAUDE.md',
@@ -95,15 +116,31 @@ describe('anchorWasTouched', () => {
   ].join('\n');
 
   it('detects a hunk that touches lines below the matching heading', () => {
-    expect(anchorWasTouched(diffText, 'event-bus')).toBe(true);
+    expect(anchorWasTouched(diffText, 'event-bus', fileText)).toBe(true);
   });
 
   it('rejects when the hunk does not touch the requested heading section', () => {
-    expect(anchorWasTouched(diffText, 'resources')).toBe(false);
+    expect(anchorWasTouched(diffText, 'resources', fileText)).toBe(false);
   });
 
   it('rejects when the diff is empty', () => {
-    expect(anchorWasTouched('', 'event-bus')).toBe(false);
+    expect(anchorWasTouched('', 'event-bus', fileText)).toBe(false);
+  });
+
+  it('detects a -U0 hunk inside the section even when the heading line is absent from the diff', () => {
+    // Reproduces the bug from the Context Commits enforcer: with -U0, the
+    // hunk only contains changed lines and not the heading line above. The
+    // implementation must use the staged file content to determine which
+    // section the changed line numbers fall in.
+    const u0Diff = [
+      'diff --git a/CLAUDE.md b/CLAUDE.md',
+      '--- a/CLAUDE.md',
+      '+++ b/CLAUDE.md',
+      '@@ -17 +17 @@',
+      '-resources line 17',
+      '+resources line 17 updated',
+    ].join('\n');
+    expect(anchorWasTouched(u0Diff, 'resources', fileText)).toBe(true);
   });
 });
 
@@ -115,6 +152,7 @@ describe('anchorWasTouched', () => {
 function makeIo(opts: {
   stagedFiles: readonly string[];
   diffs: Record<string, string>; // key: staged file path, value: unified diff for that file
+  stagedContents?: Record<string, string>; // key: staged file path, value: post-image content
   repoRoot?: string;
   contextMap: ContextMap;
   env?: Record<string, string | undefined>;
@@ -147,6 +185,10 @@ function makeIo(opts: {
           return opts.diffs[file] ?? '';
         }
         return '';
+      }
+      if (cmd === 'git' && args[0] === 'show' && typeof args[1] === 'string' && args[1].startsWith(':')) {
+        const file = args[1].slice(1);
+        return opts.stagedContents?.[file] ?? '';
       }
       if (cmd === 'git' && args[0] === 'config' && args[1] === 'user.name') {
         return `${opts.author ?? 'test-author'}\n`;
@@ -241,6 +283,73 @@ describe('runHook — Context Commits enforcement', () => {
           '@@ -10,2 +10,3 @@',
           ' ## event-bus',
           '+Documented new behaviour.',
+        ].join('\n'),
+      },
+      stagedContents: {
+        'CLAUDE.md': [
+          '# Title',
+          '',
+          'preamble line 3',
+          'preamble line 4',
+          'preamble line 5',
+          'preamble line 6',
+          'preamble line 7',
+          'preamble line 8',
+          'preamble line 9',
+          '## event-bus',
+          'Documented new behaviour.',
+          'event-bus original line 12',
+        ].join('\n'),
+      },
+      contextMap: CONTEXT_MAP,
+    });
+
+    await runHook(io);
+
+    expect(getExit()).toBe(0);
+    expect(stderrChunks.join('')).toBe('');
+  });
+
+  it('exits zero when -U0 hunks land inside the section without including the heading line', async () => {
+    // With `git diff --cached -U0` the hunk for an edit deep inside
+    // `## event-bus` does not contain the heading line. The
+    // hook must consult the staged file content to determine which section
+    // the hunk falls in instead of relying on heading lines inside the
+    // diff itself.
+    const { io, stderrChunks, getExit } = makeIo({
+      stagedFiles: [
+        'addons/forgekit_core/event_bus/game_events.gd',
+        'CLAUDE.md',
+      ],
+      diffs: {
+        'addons/forgekit_core/event_bus/game_events.gd': 'diff',
+        'CLAUDE.md': [
+          'diff --git a/CLAUDE.md b/CLAUDE.md',
+          '--- a/CLAUDE.md',
+          '+++ b/CLAUDE.md',
+          '@@ -13 +13 @@',
+          '-event-bus line 13',
+          '+event-bus line 13 updated',
+        ].join('\n'),
+      },
+      stagedContents: {
+        'CLAUDE.md': [
+          '# Title',           // 1
+          '',                  // 2
+          'preamble line 3',   // 3
+          'preamble line 4',   // 4
+          'preamble line 5',   // 5
+          'preamble line 6',   // 6
+          'preamble line 7',   // 7
+          'preamble line 8',   // 8
+          'preamble line 9',   // 9
+          '## event-bus',      // 10
+          'event-bus line 11', // 11
+          'event-bus line 12', // 12
+          'event-bus line 13 updated', // 13
+          'event-bus line 14', // 14
+          '## resources',      // 15
+          'resources line 16', // 16
         ].join('\n'),
       },
       contextMap: CONTEXT_MAP,

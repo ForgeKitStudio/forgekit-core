@@ -270,6 +270,32 @@ so the Core property test `test/property_tag_compatibility.test.ts` can
 exercise `isValidCoreMinVersion` and `buildTagRefUrl` without a
 cross-repository import. Keep both copies byte-for-byte aligned.
 
+## MCP transport
+
+`mcp-server/src/index.ts::bootstrapServer` chooses one of three modes:
+
+- **stdio (`--stdio`)** — boots an MCP `Server` over
+  `StdioServerTransport`. Stdin reads JSON-RPC requests, stdout is
+  reserved for JSON-RPC traffic, every diagnostic line goes to
+  stderr. Readiness banner:
+  `[mcp] stdio bridge ready (profile=<Profile>, tools=<count>)`. The
+  in-process `ChannelRouter` only handles `cli`-channel tools; the
+  `editor` and `runtime` channels report `channel-unavailable`
+  (`-32000`) until the Godot bridges connect. Never `console.log`
+  from any path that runs under stdio mode — the SDK assumes nothing
+  else writes to stdout.
+- **headless (default)** — boots the health endpoint on the first
+  free TCP port in `6040-6049`, installs a SIGTERM/SIGINT lifecycle,
+  and blocks until shutdown. No client transport on the local
+  process; tools still reach Godot through the bridges.
+- **smoke (`--smoke`)** — prints the skeleton acknowledgement line
+  to stderr and resolves immediately. QA-only.
+
+CLI flags: `--stdio`, `--smoke`, `--profile`, `--mcp-log-level`,
+`--license-dir`. `parseCliArgs` rejects values outside the allowed
+sets; `--profile` outside `Full|Lite|Minimal|RPG-only` raises
+`UNKNOWN_PROFILE` (`-32025`).
+
 ## Observability
 
 Phase 6B adds three observability primitives on the server side.
