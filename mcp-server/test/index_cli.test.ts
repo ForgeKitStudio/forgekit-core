@@ -38,6 +38,8 @@ describe('parseCliArgs — defaults', () => {
       stdio: false,
       profile: 'Full',
       logLevel: 'info',
+      licenseDir: undefined,
+      smoke: false,
     });
   });
 });
@@ -48,6 +50,8 @@ describe('parseCliArgs — --stdio', () => {
       stdio: true,
       profile: 'Full',
       logLevel: 'info',
+      licenseDir: undefined,
+      smoke: false,
     });
   });
 });
@@ -126,6 +130,8 @@ describe('parseCliArgs — combined flags', () => {
       stdio: true,
       profile: 'Minimal',
       logLevel: 'debug',
+      licenseDir: undefined,
+      smoke: false,
     });
   });
 });

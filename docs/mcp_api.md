@@ -57,45 +57,254 @@ alongside the `forgekit_rpg` module in the paid-module repository; the
 `modules.activate_license` call unlocks the full set behind a single
 `license_id`.
 
+## Connecting to ForgeKit MCP Server
+
+`@forgekitstudio/core-mcp` ships a stdio transport so any MCP-aware
+client can speak to it without opening a network socket. The server
+binary is launched once per session by the client and exits when the
+client closes its stdin.
+
+```sh
+npx -y @forgekitstudio/core-mcp --stdio
+```
+
+`--stdio` selects the
+[`StdioServerTransport`](https://github.com/modelcontextprotocol/typescript-sdk)
+shipped by the `@modelcontextprotocol/sdk` package; stdout is reserved
+for JSON-RPC traffic and every diagnostic line goes to stderr. The
+in-process `ChannelRouter` runs the CLI executor for `cli`-channel tools;
+the `editor` and `runtime` channels report `channel-unavailable` until
+the corresponding Godot bridges are connected (open a Godot project
+with the ForgeKit plugin enabled, or launch the game with
+`--mcp-bridge`).
+
+The configuration snippets below are the canonical way to register the
+server with each supported client. Swap `--profile Full` for `Lite`,
+`Minimal`, or `RPG-only` as needed; see [Profiles](#profiles) in the
+README for the per-profile tool counts. Pass `--license-dir <path>`
+only when license keys live outside the default Godot
+`user://licenses/` directory.
+
+### Claude Desktop
+
+Add the entry below to
+`~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
+Restart Claude Desktop after editing.
+
+```json
+{
+  "mcpServers": {
+    "forgekit": {
+      "command": "npx",
+      "args": ["-y", "@forgekitstudio/core-mcp", "--stdio", "--profile", "Full"]
+    }
+  }
+}
+```
+
+### Cursor
+
+Add the entry to `~/.cursor/mcp.json` (global) or
+`<projectRoot>/.cursor/mcp.json` (per-project). Cursor reloads the file
+on the next chat invocation; no restart required.
+
+```json
+{
+  "mcpServers": {
+    "forgekit": {
+      "command": "npx",
+      "args": ["-y", "@forgekitstudio/core-mcp", "--stdio", "--profile", "Full"]
+    }
+  }
+}
+```
+
+### Kiro
+
+Add the entry to `<projectRoot>/.kiro/settings/mcp.json` (workspace) or
+`~/.kiro/settings/mcp.json` (user-wide).
+
+```json
+{
+  "mcpServers": {
+    "forgekit": {
+      "command": "npx",
+      "args": ["-y", "@forgekitstudio/core-mcp", "--stdio", "--profile", "Full"],
+      "disabled": false,
+      "autoApprove": ["project.info", "project.list_modules"]
+    }
+  }
+}
+```
+
+`autoApprove` is optional. List the read-only tools you trust the agent
+to invoke without confirmation; mutating tools (`node.set_property`,
+`resource.save`, `modules.activate_license`, ...) should stay
+interactive.
+
+### Antigravity
+
+Antigravity discovers MCP servers from
+`~/.antigravity/mcp.json`. The server uses the `Minimal` profile by
+default to fit Antigravity's tighter context budget; switch to `Full`
+once you need the editor or runtime tool surface.
+
+```json
+{
+  "mcpServers": {
+    "forgekit": {
+      "command": "npx",
+      "args": ["-y", "@forgekitstudio/core-mcp", "--stdio", "--profile", "Minimal"]
+    }
+  }
+}
+```
+
+### Verifying the connection
+
+Once the client is configured, ask it to list ForgeKit tools. Behind
+the scenes the client calls `tools/list` over stdio; the server
+responds with the active set filtered by `--profile` and any
+`forgekit_rpg.key` activations on disk. A typical first response shape
+is:
+
+```json
+{
+  "tools": [
+    {
+      "name": "project.info",
+      "description": "Returns a stable summary of a Godot project: name, godot_version, api_version, modules_count, root_path.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectRoot": { "type": "string", "minLength": 1 },
+          "apiVersion": { "type": "string", "minLength": 1 }
+        },
+        "required": ["projectRoot", "apiVersion"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
+```
+
+The `Full` profile returns 271 entries with the same shape. Diagnostic
+lines are written to stderr (the client surfaces them in its log
+panel); the canonical readiness banner is
+`[mcp] stdio bridge ready (profile=<Profile>, tools=<count>)`.
+
+## Channel routing
+
+Every tool declares a `channel` attribute in `profiles.json`. The
+`ChannelRouter` (`mcp-server/src/dispatcher/channel_router.ts`) reads
+that attribute on every JSON-RPC dispatch and forwards the call to the
+matching transport client. The four supported channels are listed
+below with a representative example, the transport that handles them,
+and the failure mode the router surfaces.
+
+| Channel   | Transport                                                         | Default ports | Counts (Full) | Example tools                                              | Failure mode                                                                                                  |
+| --------- | ----------------------------------------------------------------- | ------------- | ------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `editor`  | WebSocket JSON-RPC 2.0 over `127.0.0.1` to the Godot plugin       | `6010-6019`   | 154           | `scene.open`, `node.set_property`, `resource.save`         | `editorClient.isConnected() === false` → `DispatchChannelUnavailable {channel: "editor"}` (`-32000`).         |
+| `runtime` | UDP JSON-RPC framed into single datagrams to the running game     | `6020-6029`   | 99            | `runtime.get_logs`, `physics_runtime.raycast`              | Bridge inactive (game not launched with `--mcp-bridge`) → `DispatchChannelUnavailable {channel: "runtime"}`.  |
+| `cli`     | `spawn("godot", ["--headless", ...])` from the server process     | —             | 13            | `tests.run_unit`, `export.run_preset`, `android.list_devices` | Spawn fails or `godot` not on `PATH` → `DispatchError {code: -32603}` with `data.original_error`.             |
+| `cross`   | Multi-step orchestrator that spans transports inside a single call | —             | 5             | `runtime.handshake`, `runtime.heartbeat`, `runtime.is_connected`, `runtime.shutdown`, `input.list_actions` | Same envelopes as the underlying channels; the router catches any thrown exception and returns `-32603`. |
+
+The `cross` channel is the only one without a single dedicated
+transport. `runtime.handshake` and the other `cross` tools combine
+state owned by the editor plugin (config, license registry) with state
+owned by the runtime bridge (UDP socket health, frame counters); the
+dispatcher routes the call through `crossExecutor.invoke(method,
+params)` so the orchestration logic stays out of any single channel
+client. Counts in the table reflect the v0.9.x `Full` profile snapshot
+shipped in `mcp-server/profiles.json` and total 271 tools.
+
+Per-call timeouts apply uniformly: any `editor`, `runtime`, `cli`, or
+`cross` invocation that exceeds `timeoutMs` (default 30 000 ms)
+resolves to `DispatchError {code: -32001, message: "channel_timeout",
+data: {channel, method, elapsed_ms}}`. Clients are expected to retry
+the request; the next call may succeed if the underlying transport has
+recovered.
+
 ## Known error codes
 
 Every ForgeKit-specific error code uses the negative JSON-RPC server
-error range (`-32000` to `-32099`). The table below consolidates the
-codes referenced throughout this document; per-tool sections repeat
+error range (`-32000` to `-32099`). The table below mirrors the
+canonical registry in
+[`mcp-server/src/dispatcher/error_codes.ts`](../mcp-server/src/dispatcher/error_codes.ts);
+the CI script `scripts/ci/validate-error-codes.ts` walks every
+`throw new (Cli|Cross)DispatchError(...)` site and asserts the numeric
+code is registered there. New codes must be added in that file before
+they can be raised. Per-tool sections later in this document repeat
 the relevant entry with the exact `data` payload.
 
-| Code     | Symbol                                   | Channel(s)    | Meaning |
-| -------- | ---------------------------------------- | ------------- | ------- |
-| `-32004` | `NON_UNDOABLE_OPERATION`                 | editor        | Advisory warning on a successful result when the mutation happens outside `EditorUndoRedoManager`. |
-| `-32005` | `PACKET_TOO_LARGE`                       | runtime       | UDP datagram above the 65 507-byte limit. `data` carries `{size, limit, suggestion}`. |
-| `-32005` | `MODULE_NOT_FOUND`                       | editor, cli   | A `modules.*` call referenced a `module_id` not installed under `<projectRoot>/addons/`. Shares the numeric code with `PACKET_TOO_LARGE`; disambiguated by channel and by `message`. |
-| `-32006` | `license_verification_failed`            | editor, cli   | `modules.activate_license` rejected the supplied signature. `data` carries `{module_id}`. |
-| `-32007` | `ACTIVATION_FAILED`                      | editor, cli   | `modules.activate_license` failed for a non-canonical reason (file I/O, HMAC-context error). `data` carries `{module_id, original_error}`. |
-| `-32008` | `CORE_VERSION_UNAVAILABLE`               | editor, cli   | `modules.check_compatibility` could not resolve the installed Core version from the repository git tag. `data.reason` is `"git_describe_failed"` or `"git_describe_empty"`. |
-| `-32009` | `TRANSACTION_NOT_OPEN`                   | editor        | `transaction.commit` / `transaction.rollback` was called with a `transaction_id` that is not currently open. |
-| `-32011` | `MANIFEST_TAG_NOT_FOUND`                 | cli (release) | `manifest.core_min_version` points at a Git tag that does not exist in Core. `data` carries `{tag}`. |
-| `-32012` | `CONTEXT_FILE_STALE`                     | cli (hooks)   | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. Raised by the `pre-commit` hook. |
-| `-32013` | `CONVENTIONAL_COMMITS_FORMAT_VIOLATION`  | cli (hooks)   | Commit message does not match the Conventional Commits grammar. Raised by the `commit-msg` hook. |
-| `-32014` | `PR_TEMPLATE_INCOMPLETE`                 | cli (CI)      | Pull request description is missing one of the four required sections. |
-| `-32015` | `WORKSPACE_NOT_FOUND`                    | editor, runtime, cli | `workspace_id` is not registered. `data` carries `{workspace_id}`. |
-| `-32016` | `WORKSPACE_ALREADY_REGISTERED`           | editor, cli   | `project.add` was called with a `workspace_id` already mapped to a different record. `data` carries `{workspace_id, existing_workspace}`. |
-| `-32017` | `PROJECT_ROOT_ALREADY_REGISTERED`        | editor, cli   | `project.add` was called with a `projectRoot` already owned by another workspace. `data` carries `{projectRoot, existing_workspace_id}`. |
-| `-32018` | `INVALID_PROJECT_ROOT`                   | editor, cli   | `projectRoot` failed path validation. `data` carries `{projectRoot, reason}` where `reason ∈ {"not_absolute", "not_a_directory", "missing_project_godot"}`. |
-| `-32019` | `WORKSPACE_LIMIT_EXCEEDED`               | editor, cli   | Attempted to register beyond the `MAX_WORKSPACES = 32` limit. `data` carries `{limit, current}`. |
-| `-32020` | `PORT_RANGE_EXHAUSTED`                   | editor, runtime | Every port in the range is occupied (between kernel-level binds and ports already taken by sibling workspaces). `data` carries `{channel, range_start, range_end, in_use}`. |
-| `-32021` | `NO_ACTIVE_WORKSPACE`                    | editor, runtime, cli | A tool call without `workspace_id` reached the dispatcher while the registry is empty. `data` is `{}`. |
-| `-32022` | `WORKSPACE_ROOT_MISMATCH`                | editor, runtime, cli | Explicit `projectRoot` does not match the resolved workspace's registered root. `data` carries `{workspace_id, registered_project_root, requested_project_root}`. |
+JSON-RPC reserved range (`-32700`..`-32603`):
+
+| Code     | Symbol             | Default `data.suggestion` |
+| -------- | ------------------ | ------------------------- |
+| `-32700` | `PARSE_ERROR`      | Verify the request body is valid JSON; the server could not parse the framing. |
+| `-32600` | `INVALID_REQUEST`  | Ensure the JSON-RPC envelope has `jsonrpc:"2.0"`, a numeric or string `id`, and a method string. |
+| `-32601` | `METHOD_NOT_FOUND` | Call `tools/list` to see the methods registered for the active profile and license set. |
+| `-32602` | `INVALID_PARAMS`   | Inspect the tool schema (`tools/list`) and resend the request with the required params. |
+| `-32603` | `INTERNAL_ERROR`   | Retry the request; if the failure persists, capture `data.detail` and the trace_id and file an issue. |
+
+ForgeKit application range (`-32000`..`-32099`):
+
+| Code     | Symbol                                   | Channel(s)              | Meaning |
+| -------- | ---------------------------------------- | ----------------------- | ------- |
+| `-32000` | `CHANNEL_UNAVAILABLE`                    | editor, runtime         | Editor or runtime client reported `isConnected() === false` at dispatch time. `data.suggestion` recommends checking `mcp.health` before retrying. |
+| `-32001` | `CHANNEL_TIMEOUT`                        | editor, runtime, cli, cross | Per-call timeout (default 30 000 ms) elapsed before the downstream channel replied. `data` carries `{channel, method, elapsed_ms}`. |
+| `-32002` | `PACKET_TOO_LARGE`                       | runtime (server-side)   | Server-side guard for outbound UDP datagrams above 65 507 bytes; reject before send. |
+| `-32003` | `UNDO_REDO_FAILED`                       | editor                  | `EditorUndoRedoManager` rejected the action (closed scene, race with a manual undo). |
+| `-32004` | `TRANSACTION_TIMEOUT`                    | editor                  | Open transaction auto-rolled back after the configured deadline; client must call `transaction.begin` again. |
+| `-32004` | `NON_UNDOABLE_OPERATION`                 | editor                  | Advisory warning attached to a successful `result` when the mutation lives outside `EditorUndoRedoManager`. Shares the numeric code with `TRANSACTION_TIMEOUT` but is delivered as a warning envelope, not an error. |
+| `-32005` | `PACKET_TOO_LARGE_RUNTIME`               | runtime                 | Inbound UDP datagram above the 65 507-byte limit. `data` carries `{size, limit, suggestion}`. |
+| `-32005` | `MODULE_NOT_FOUND`                       | editor, cli             | A `modules.*` call referenced a `module_id` not installed under `<projectRoot>/addons/`. Shares the numeric code with `PACKET_TOO_LARGE_RUNTIME`; disambiguated by channel and by `message`. |
+| `-32006` | `CORE_VERSION_MISMATCH`                  | editor, cli             | `module.manifest.tres.core_min_version` is higher than the installed Core git tag. |
+| `-32006` | `license_verification_failed`            | editor, cli             | `modules.activate_license` rejected the supplied signature. `data` carries `{module_id}`. Shares the numeric code with `CORE_VERSION_MISMATCH`; disambiguated by `message`. |
+| `-32007` | `NESTED_TRANSACTION_NOT_ALLOWED`         | editor                  | `transaction.begin` was called while another transaction is still open. |
+| `-32007` | `ACTIVATION_FAILED`                      | editor, cli             | `modules.activate_license` failed for a non-canonical reason (file I/O, HMAC-context error). `data` carries `{module_id, original_error}`. |
+| `-32008` | `CORE_VERSION_UNAVAILABLE`               | editor, cli             | `modules.check_compatibility` could not resolve the installed Core version from `git describe --tags`. `data.reason` is `"git_describe_failed"` or `"git_describe_empty"`. |
+| `-32009` | `GDSCRIPT_SYNTAX_ERROR`                  | editor, cli             | `script.save` aborted because the supplied source did not parse. The script was not written to disk. |
+| `-32009` | `TRANSACTION_NOT_OPEN`                   | editor                  | `transaction.commit` / `transaction.rollback` was called with a `transaction_id` that is not currently open. |
+| `-32010` | `CORE_BOUNDARY_VIOLATION`                | editor, cli             | A write targeted a path under `addons/forgekit_core/**` (or another denied prefix). `data` carries the path and the matched rule. |
+| `-32011` | `MANIFEST_TAG_NOT_FOUND`                 | cli (release)           | `manifest.core_min_version` points at a Git tag that does not exist in Core. `data` carries `{tag}`. |
+| `-32012` | `CONTEXT_FILE_STALE`                     | cli (hooks)             | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. Raised by the `pre-commit` hook. |
+| `-32013` | `CONVENTIONAL_COMMITS_FORMAT_VIOLATION`  | cli (hooks)             | Commit message does not match the Conventional Commits grammar. Raised by the `commit-msg` hook. |
+| `-32014` | `PR_TEMPLATE_INCOMPLETE`                 | cli (CI)                | Pull request description is missing one of the four required sections. |
+| `-32015` | `WORKSPACE_NOT_FOUND`                    | editor, runtime, cli    | `workspace_id` is not registered. `data` carries `{workspace_id}`. |
+| `-32016` | `WORKSPACE_ALREADY_REGISTERED`           | editor, cli             | `project.add` was called with a `workspace_id` already mapped to a different record. `data` carries `{workspace_id, existing_workspace}`. |
+| `-32017` | `PROJECT_ROOT_ALREADY_REGISTERED`        | editor, cli             | `project.add` was called with a `projectRoot` already owned by another workspace. `data` carries `{projectRoot, existing_workspace_id}`. |
+| `-32018` | `INVALID_PROJECT_ROOT`                   | editor, cli             | `projectRoot` failed path validation. `data` carries `{projectRoot, reason}` where `reason ∈ {"not_absolute", "not_a_directory", "missing_project_godot"}`. |
+| `-32019` | `WORKSPACE_LIMIT_EXCEEDED`               | editor, cli             | Attempted to register beyond the `MAX_WORKSPACES = 32` limit. `data` carries `{limit, current}`. |
+| `-32020` | `PORT_RANGE_EXHAUSTED`                   | editor, runtime         | Every port in the range is occupied. `data` carries `{channel, range_start, range_end, in_use}`. |
+| `-32021` | `NO_ACTIVE_WORKSPACE`                    | editor, runtime, cli    | A tool call without `workspace_id` reached the dispatcher while the registry is empty. `data` is `{}`. |
+| `-32022` | `WORKSPACE_ROOT_MISMATCH`                | editor, runtime, cli    | Explicit `projectRoot` does not match the resolved workspace's registered root. `data` carries `{workspace_id, registered_project_root, requested_project_root}`. |
+| `-32023` | `LICENSE_INVALID`                        | editor, cli             | The active license for the requested module failed verification or expired. `data.suggestion` points at `modules.activate_license`. |
+| `-32024` | `PROFILE_TOOL_FILTERED`                  | editor, runtime, cli    | The active profile or license set hides the tool. `data` carries `{method, required_modules}` so the client can prompt the user to switch profile or activate the licence. |
+| `-32025` | `UNKNOWN_PROFILE`                        | server (startup)        | `--profile` received a value outside `Full|Lite|Minimal|RPG-only`. |
+
+Two numeric codes (`-32004`, `-32005`, `-32006`, `-32007`, `-32009`)
+are reused for distinct symbolic names. The reuse is intentional: the
+server distinguishes the symbols by `message` (and, where relevant, by
+the originating channel) so that pre-existing emitters in
+`tools/modules/errors.ts`, `projects/errors.ts`, and
+`auth_verifier.ts` continue to work without renumbering. Clients
+should always read the `message` field rather than dispatching off
+`code` alone when the table shows two rows for the same number.
 
 ## Transports
 
-The server multiplexes calls across three channels. Every tool is
-annotated with the channel it uses.
+The server multiplexes calls across four channels. Every tool is
+annotated with the channel it uses; see [Channel routing](#channel-routing)
+for routing semantics and counts.
 
-| Channel   | Transport                               | Default ports | Notes |
-| --------- | --------------------------------------- | ------------- | ----- |
-| `editor`  | WebSocket JSON-RPC 2.0                  | `6010-6019`   | Runs in the Godot editor via the plugin. |
-| `cli`     | `spawn("godot", ["--headless", ...])`   | —             | Used by CI and pre-commit; returns a `TestReport` on stdout. |
-| `runtime` | UDP JSON-RPC framed into single datagrams | `6020-6029`   | Active only with `--mcp-bridge`; datagrams over 65 507 bytes are rejected with `PACKET_TOO_LARGE`. |
+| Channel   | Transport                                  | Default ports | Notes |
+| --------- | ------------------------------------------ | ------------- | ----- |
+| `editor`  | WebSocket JSON-RPC 2.0                     | `6010-6019`   | Runs in the Godot editor via the plugin. |
+| `runtime` | UDP JSON-RPC framed into single datagrams  | `6020-6029`   | Active only with `--mcp-bridge`; datagrams over 65 507 bytes are rejected with `PACKET_TOO_LARGE`. |
+| `cli`     | `spawn("godot", ["--headless", ...])`      | —             | Used by CI and pre-commit; returns a `TestReport` on stdout. |
+| `cross`   | Orchestrator inside the server process     | —             | Combines state from multiple channels in a single call (e.g. `runtime.handshake`). |
 
 ## JSON-RPC 2.0 envelope
 
@@ -113,21 +322,10 @@ each tool is a JSON object with the fields documented below.
 
 Successful responses carry a `result` object. Errors use the standard
 JSON-RPC `error` object. ForgeKit-specific error codes live in the
-negative range reserved for server errors (`-32000` to `-32099`):
-
-| Code     | Symbol                             | Meaning |
-| -------- | ---------------------------------- | ------- |
-| `-32004` | `NON_UNDOABLE_OPERATION`           | Warning envelope attached to a successful result when the underlying mutation happens outside `EditorUndoRedoManager`. |
-| `-32005` | `PACKET_TOO_LARGE`                 | A UDP datagram arriving on the `runtime` channel exceeds the configured size limit. `data` carries `{ size, limit, suggestion }`, where `size` is the rejected datagram's byte length and `limit` defaults to 65 507 (the IPv4 UDP payload ceiling). |
-| `-32005` | `MODULE_NOT_FOUND`                 | A `modules.*` tool was called with a `module_id` that is not present under `<projectRoot>/addons/`. Shares a numeric code with `PACKET_TOO_LARGE` but is disambiguated by `message` and by the originating channel (`editor` / `cli`, not `runtime`). |
-| `-32006` | `license_verification_failed`      | `modules.activate_license` rejected the supplied license. `data` carries `{ module_id }`. |
-| `-32007` | `ACTIVATION_FAILED`                | `modules.activate_license` failed for a non-canonical reason (file I/O, HMAC-context errors). `data` carries `{ module_id, original_error }`. |
-| `-32008` | `CORE_VERSION_UNAVAILABLE`         | `modules.check_compatibility` could not resolve the installed Core version from the repository's git tag. `data.reason` is `"git_describe_failed"` or `"git_describe_empty"`; `data.git_stderr` mirrors git's stderr when present. |
-| `-32009` | `TRANSACTION_NOT_OPEN`             | `transaction.commit` / `transaction.rollback` was called with a `transaction_id` that is not currently open. |
-| `-32011` | `MANIFEST_TAG_NOT_FOUND`           | `manifest.core_min_version` points at a Git tag that does not exist in Core. |
-| `-32012` | `CONTEXT_FILE_STALE`               | `CLAUDE.md` / `.cursorrules` not updated alongside a code change. |
-| `-32013` | `CONVENTIONAL_COMMITS_FORMAT_VIOLATION` | Commit message does not match the Conventional Commits grammar. |
-| `-32014` | `PR_TEMPLATE_INCOMPLETE`           | Pull request description is missing one of the required sections. |
+negative range reserved for server errors (`-32000` to `-32099`); see
+[Known error codes](#known-error-codes) above for the full registry,
+including the JSON-RPC reserved range and the per-channel context
+that disambiguates the few numeric codes shared between two symbols.
 
 Tool-level errors thrown during validation (missing `projectRoot`,
 unknown section name, malformed patch) raise `ToolInputError`. I/O

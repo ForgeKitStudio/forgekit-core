@@ -1,0 +1,1632 @@
+{
+  "version": "0.1.0",
+  "description": "Tool surface manifest for @forgekitstudio/core-mcp. Lists every editor-plugin, runtime-bridge, MCP server, and RPG-module tool that may be exposed to clients. Profile filtering is applied at runtime based on scope / channel / module attributes and the active license keys.",
+  "tools": [
+    {
+      "name": "project.info",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.list_modules",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.list_workspaces",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.switch",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.add",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.remove",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.get_active",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.open",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "node.add",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.set_property",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "input.simulate_action",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core-minimal"
+    },
+    {
+      "name": "input.simulate_key",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "input.simulate_mouse_button",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "input.simulate_mouse_motion",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "input.list_actions",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "input.configure_action",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "input.remove_action",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "profiling.get_performance_monitors",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "profiling.get_frame_stats",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "combat.list_hitboxes",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "combat"
+    },
+    {
+      "name": "crafting.execute",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.list_recipes",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.get_recipe",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.create_recipe",
+      "scope": "module",
+      "channel": "editor",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.update_recipe",
+      "scope": "module",
+      "channel": "editor",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.delete_recipe",
+      "scope": "module",
+      "channel": "editor",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.validate_recipe",
+      "scope": "module",
+      "channel": "cli",
+      "module": "crafting"
+    },
+    {
+      "name": "crafting.simulate_cost",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "crafting"
+    },
+    {
+      "name": "inventory.add_item",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.remove_item",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.get_count",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.snapshot",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.clear",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.transfer",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "inventory.set_capacity",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "inventory"
+    },
+    {
+      "name": "stats.get_stat",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "stats"
+    },
+    {
+      "name": "effects.apply",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.remove",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.list_active",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.tick_advance",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.list_resources",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "effects.create_resource",
+      "scope": "module",
+      "channel": "editor",
+      "module": "effects"
+    },
+    {
+      "name": "effects.validate_resource",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "effects"
+    },
+    {
+      "name": "magic.cast",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.list_spells",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.get_spell",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.create_spell",
+      "scope": "module",
+      "channel": "editor",
+      "module": "magic"
+    },
+    {
+      "name": "magic.update_spell",
+      "scope": "module",
+      "channel": "editor",
+      "module": "magic"
+    },
+    {
+      "name": "magic.delete_spell",
+      "scope": "module",
+      "channel": "editor",
+      "module": "magic"
+    },
+    {
+      "name": "magic.get_cooldowns",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "magic.reset_cooldowns",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "magic"
+    },
+    {
+      "name": "equipment.equip",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.unequip",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.get_slot",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.snapshot",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.list_slots",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "equipment"
+    },
+    {
+      "name": "equipment.configure_slots",
+      "scope": "module",
+      "channel": "editor",
+      "module": "equipment"
+    },
+    {
+      "name": "progression.grant_xp",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.get_state",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.allocate_stat_point",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.reset",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.list_curves",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.get_curve",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.list_rewards",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "progression.get_reward",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "progression"
+    },
+    {
+      "name": "enemies.spawn",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.list_active",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.get_state",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.kill",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.list_resources",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.get_resource",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "enemies"
+    },
+    {
+      "name": "enemies.create_resource",
+      "scope": "module",
+      "channel": "editor",
+      "module": "enemies"
+    },
+    {
+      "name": "loot.list_tables",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "loot.get_table",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "loot.roll",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "loot.simulate",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "loot"
+    },
+    {
+      "name": "spawner.start_wave",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.stop",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.get_state",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.list_waves",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "spawner.get_wave",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "spawner"
+    },
+    {
+      "name": "chests.open",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "chests.close",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "chests.is_opened",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "chests.list_active",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "chests"
+    },
+    {
+      "name": "npc.list_npcs",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "npc"
+    },
+    {
+      "name": "npc.get_npc",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "npc"
+    },
+    {
+      "name": "dialog.start",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "dialog.select",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "dialog.list_dialogs",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "dialog.get_dialog",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "dialog"
+    },
+    {
+      "name": "vendor.buy",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.sell",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.list_vendors",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.get_vendor",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "vendor.refresh_stock",
+      "scope": "module",
+      "channel": "runtime",
+      "module": "vendor"
+    },
+    {
+      "name": "visualizer.start",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.stop",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.render_scene_tree",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.render_module_graph",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "visualizer.render_event_bus",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.sprite_from_svg",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.atlas_pack",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.noise_texture",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "assetgen.icon_set",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.suggest_action",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.inspect_failure",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.get_retry_count",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.reset_retry_count",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "healing.apply_and_retest",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.list",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.play",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.stop",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.add_track",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.insert_keyframe",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation.remove_track",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.set_cell",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.get_cell",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.fill_rect",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.clear_layer",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.import_from_json",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tilemap.export_to_json",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.set_default_font",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.set_color",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "theme.set_stylebox",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "ui.build_control_tree",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "ui.apply_layout_preset",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.validate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.save_with_validation",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.set_uniform",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.list_uniforms",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "shader.convert_visual_to_text",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.set_gravity",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.get_collision_layer_names",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.configure_layer",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "physics.raycast",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "physics.shape_cast",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "physics.query_point",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.add_mesh_instance",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.add_light",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.add_camera",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.set_environment",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.bake_lightmap",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "scene3d.import_gltf",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.create_gpu",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.create_cpu",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.set_emission_shape",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.preview_in_editor",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "particle.convert_cpu_to_gpu",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.bake_mesh",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.add_agent",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.set_avoidance",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.configure_layers",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "navigation.find_path",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "navigation.debug_draw",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "audio.list_buses",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.set_bus_volume_db",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.add_bus_effect",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.import_sound",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "audio.play_stream",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "audio.stop_stream",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.set_parameter",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.get_parameters",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "animation_tree.set_active",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "state_machine.list_states",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "state_machine.travel",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "state_machine.get_current",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "blend_tree.configure_node",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "export.list_presets",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "export.run_preset",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "export.validate_preset",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "android.list_devices",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "android.install_apk",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "android.run_logcat",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "batch.dry_run",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "batch.execute",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.clear_output",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.focus_node",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_errors",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_output_log",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_selection",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.get_undo_stack",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.redo",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.set_selection",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "editor.undo",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "gdscript.save_with_validation",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "gdscript.validate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.call_method",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "node.connect_signal",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.disconnect_signal",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.duplicate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.find_by_name",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.find_by_type",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.get_properties",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.get_property",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.get_signals",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.remove",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.rename",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "node.reparent",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.find_unused_assets",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.move_file",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.organize_imports",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.rename_class",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "refactor.rename_method",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.apply_fix",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.duplicate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.inspect",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.list_by_type",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.load",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "resource.save",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "runtime.change_scene",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.emit_event",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.eval_safe",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_autoload",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_current_scene",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_fps",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_logs",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_scene_tree",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.get_time_scale",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.handshake",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "runtime.heartbeat",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "runtime.is_connected",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "runtime.list_autoloads",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.pause",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.reload_current_scene",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.resume",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.screenshot",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.set_time_scale",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "runtime.shutdown",
+      "scope": "core",
+      "channel": "cross",
+      "module": "core"
+    },
+    {
+      "name": "scene.close",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.get_tree",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.get_tree_snapshot",
+      "scope": "core",
+      "channel": "runtime",
+      "module": "core"
+    },
+    {
+      "name": "scene.instantiate",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.list_open",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.save",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "scene.save_as",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "script.attach",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.create",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.detach",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.get_documentation",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.list_classes",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "script.load",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "transaction.begin",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "transaction.commit",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "transaction.rollback",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "analysis.count_nodes_by_type",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "analysis.dependency_graph",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "search.code",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "search.references",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "project.check_imports",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.get_settings",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.list_addons",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.reload",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "project.update_settings",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core-minimal"
+    },
+    {
+      "name": "modules.list",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.enable",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.disable",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.activate_license",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.check_compatibility",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.inspect_manifest",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "modules.core_version",
+      "scope": "core",
+      "channel": "editor",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_unit",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_suite",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_gameplay",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "tests.run_property",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "test_report.parse",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    },
+    {
+      "name": "test_report.serialize",
+      "scope": "core",
+      "channel": "cli",
+      "module": "core"
+    }
+  ]
+}

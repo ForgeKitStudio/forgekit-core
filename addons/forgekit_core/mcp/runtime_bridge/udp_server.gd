@@ -15,6 +15,14 @@ extends RefCounted
 ## before they reach the JSON-RPC dispatcher. Passing `null`
 ## falls back to the defaults embedded below (loopback bind,
 ## IPv4 UDP size limit, auth disabled).
+##
+## Receive loop. After `start()` succeeds, callers (typically McpBridge
+## from `_process()`) drive the receive loop by invoking `poll()` once
+## per frame. `poll()` drains every buffered datagram, parses each
+## through the `McpRuntimePacketParser`, dispatches accepted requests
+## through the supplied `McpJsonRpcDispatcher`, and replies to the
+## sender via the bound socket. Pass the dispatcher via
+## `set_dispatcher()` before the first `poll()`.
 
 class_name McpUdpServer
 
@@ -28,11 +36,19 @@ const DEFAULT_BIND_ADDRESS: String = "127.0.0.1"
 const ACTIVE_PORT_FILE: String = "user://mcp_active_port.json"
 const ACTIVE_PORT_KEY: String = "runtime"
 
+# Hard cap on datagrams drained per `poll()` call. Without it a flood
+# of packets could starve the rest of `_process()`. The number is large
+# enough that legitimate bursts (handshake + several tool calls in the
+# same frame) are absorbed in one poll, yet small enough that the
+# remaining traffic is naturally back-pressured to the next frame.
+const _MAX_DATAGRAMS_PER_POLL: int = 32
+
 
 var _udp_peer: PacketPeerUDP = null
 var _active_port: int = -1
 var _warnings: Array = []
 var _packet_parser: Object = null
+var _dispatcher: Object = null
 
 # Renamer callable — `func(from_path: String, to_path: String) -> int` where
 # the returned int follows `@GlobalScope.Error` conventions (OK on success).
@@ -46,6 +62,24 @@ var _renamer: Callable = Callable(DirAccess, "rename_absolute")
 ## filesystem.
 func set_renamer(renamer: Callable) -> void:
 	_renamer = renamer
+
+
+## Configure the JSON-RPC dispatcher invoked for every accepted
+## datagram. The dispatcher must expose `dispatch(request: Variant) ->
+## Dictionary` returning a JSON-RPC envelope (or empty dict for
+## notifications). Passing null disables the receive loop — `poll()`
+## becomes a no-op and incoming traffic is silently dropped after the
+## packet parser stage. Tests inject a fake dispatcher; `McpBridge`
+## injects a real `McpJsonRpcDispatcher` after registering tool
+## handlers.
+func set_dispatcher(dispatcher: Object) -> void:
+	_dispatcher = dispatcher
+
+
+## True once the dispatcher is wired so the receive loop can hand
+## packets to it. `poll()` early-exits when this returns false.
+func has_dispatcher() -> bool:
+	return _dispatcher != null
 
 
 ## Start the server, scanning the configured port range.
@@ -120,6 +154,79 @@ func get_warnings() -> Array:
 ## of the receive loop wired up in later phases.
 func get_packet_parser() -> Object:
 	return _packet_parser
+
+
+## Drain every buffered datagram, parse and dispatch each, and reply
+## to the sender on the same socket. Designed to be called once per
+## frame from `_process()` on the autoload that owns this server.
+##
+## A single `poll()` call processes up to `_MAX_DATAGRAMS_PER_POLL`
+## packets so a flood cannot starve the rest of the frame. Remaining
+## packets are picked up on the next call.
+##
+## Notifications (JSON-RPC requests without an `id` field) produce no
+## reply — `dispatch()` returns an empty dictionary which is silently
+## skipped here. Errors at any stage of the pipeline (size gate, JSON
+## parse, auth, dispatcher exception) are wrapped into a JSON-RPC
+## error response and sent back to the sender so the client never
+## hangs waiting for a reply.
+func poll() -> int:
+	if _udp_peer == null or not _udp_peer.is_bound():
+		return 0
+	if _packet_parser == null or _dispatcher == null:
+		return 0
+
+	var processed: int = 0
+	while processed < _MAX_DATAGRAMS_PER_POLL and _udp_peer.get_available_packet_count() > 0:
+		var raw: PackedByteArray = _udp_peer.get_packet()
+		var sender_address: String = _udp_peer.get_packet_ip()
+		var sender_port: int = _udp_peer.get_packet_port()
+		processed += 1
+
+		var parse_result: Dictionary = _packet_parser.parse(raw)
+		if not parse_result.get("ok", false):
+			# The parser already shaped the JSON-RPC error envelope.
+			# Echo `id: null` because we never decoded the original
+			# request far enough to recover the caller's id.
+			_send_error(sender_address, sender_port, parse_result.get("error", {}), null)
+			continue
+
+		var request: Dictionary = parse_result.get("request", {}) as Dictionary
+		var auth_token: String = String(parse_result.get("auth_token", ""))
+
+		var response: Dictionary = _dispatcher.dispatch(request, auth_token)
+		if response.is_empty():
+			# Notification — no reply required.
+			continue
+
+		_send_packet(sender_address, sender_port, JSON.stringify(response))
+	return processed
+
+
+# Send a JSON-RPC error envelope with id=null. Used when the packet
+# parser rejects a datagram before we ever see the request body.
+func _send_error(address: String, port: int, error: Dictionary, id: Variant) -> void:
+	var envelope: Dictionary = {
+		"jsonrpc": "2.0",
+		"error": error,
+		"id": id,
+	}
+	_send_packet(address, port, JSON.stringify(envelope))
+
+
+# Set the destination on the bound socket and put a single datagram.
+# Errors are surfaced as `push_warning` so a misbehaving client cannot
+# silently break observability.
+func _send_packet(address: String, port: int, payload: String) -> void:
+	if _udp_peer == null:
+		return
+	var dest_err: int = _udp_peer.set_dest_address(address, port)
+	if dest_err != OK:
+		push_warning("McpUdpServer: set_dest_address(%s:%d) failed with %d" % [address, port, dest_err])
+		return
+	var put_err: int = _udp_peer.put_packet(payload.to_utf8_buffer())
+	if put_err != OK:
+		push_warning("McpUdpServer: put_packet to %s:%d failed with %d" % [address, port, put_err])
 
 
 # ---------------------------------------------------------------------------

@@ -9,12 +9,21 @@
 #   - ci / language-policy
 #   - ci / coverage-matrix
 #   - ci / check-pr-template
+#   - ci / schema-validation
+#   - ci / error-codes-validation
+#   - ci / tests-e2e (stdio-mode)
+#   - ci / tests-e2e (headless-mode)
 #
 # The jobs below are intentionally named to match these required checks.
 # Each job installs its own toolchain from scratch (Godot via
 # `chickensoft-games/setup-godot`, Node.js via `actions/setup-node`, GUT
 # pulled from the upstream GitHub release tarball) so the public template
 # can stay slim — `addons/gut/` is not vendored in the repo.
+#
+# `tests-e2e` runs as a matrix over `mode: [stdio-mode, headless-mode]`
+# so each cell registers as its own status check (the GitHub Actions
+# convention is `<job-name> (<matrix-value>)`). Both cells must turn
+# green for the overall `tests-e2e` requirement to pass.
 
 name: ci
 
@@ -353,3 +362,141 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         shell: bash
         run: printf '%s' "${PR_BODY:-}" | node mcp-server/dist/scripts/ci/check-pr-template.js
+
+  # -------------------------------------------------------------------------
+  # Schema validation — confirms every tool in `mcp-server/profiles.json`
+  # has a registered entry in `src/schema/tool_schemas.ts` and that every
+  # input/output schema compiles cleanly through Ajv 8 (JSON Schema Draft
+  # 2020-12). Driven by `scripts/ci/validate-schemas.ts`.
+  # -------------------------------------------------------------------------
+  schema-validation:
+    name: schema-validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install and build MCP server
+        working-directory: mcp-server
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+
+      - name: Validate tool schemas against profiles.json
+        working-directory: mcp-server
+        shell: bash
+        run: node dist/scripts/ci/validate-schemas.js
+
+  # -------------------------------------------------------------------------
+  # Error code validation — confirms every `throw new (Cli|Cross)
+  # DispatchError(code, ...)` site in `mcp-server/src/**/*.ts` references a
+  # numeric code registered in `src/dispatcher/error_codes.ts`. Driven by
+  # `scripts/validate-error-codes.ts` (also exposed as the `lint:errors`
+  # npm script).
+  # -------------------------------------------------------------------------
+  error-codes-validation:
+    name: error-codes-validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install MCP server dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Validate dispatch error codes
+        working-directory: mcp-server
+        shell: bash
+        run: npm run lint:errors
+
+  # -------------------------------------------------------------------------
+  # End-to-end tests — exercises the six E2E scenarios under
+  # `mcp-server/test/e2e/` (combat hitbox, crafting full scenario, editor
+  # scene round trip, CLI run_unit, cross-channel transaction, auth_token
+  # enforcement). Each scenario spawns a real Godot 4.6.2 process and
+  # connects through the MCP transport.
+  #
+  # The job runs as a `mode: [stdio-mode, headless-mode]` matrix so each
+  # cell surfaces as its own required status check on `main`. Both cells
+  # execute the same Vitest discovery (`test/e2e/**`); the `mode` value is
+  # exported as `MCP_E2E_MODE` so future test code can branch on it
+  # without changing the CI surface.
+  # -------------------------------------------------------------------------
+  tests-e2e:
+    name: tests-e2e
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [stdio-mode, headless-mode]
+    env:
+      MCP_E2E_MODE: ${{ matrix.mode }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Install GUT ${{ env.GUT_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "addons/gut/gut_cmdln.gd" ]; then
+            echo "GUT already present — skipping download"
+            exit 0
+          fi
+          curl -fsSL -o /tmp/gut.tar.gz \
+            "https://github.com/bitwes/Gut/archive/refs/tags/v${GUT_VERSION}.tar.gz"
+          tar -xzf /tmp/gut.tar.gz -C /tmp
+          mkdir -p addons
+          mv "/tmp/Gut-${GUT_VERSION}/addons/gut" addons/gut
+          test -f "addons/gut/gut_cmdln.gd"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install MCP server dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Pre-warm Godot global class cache
+        # The E2E scenarios shell out to Godot with `class_name`
+        # references resolved across multiple files. Running
+        # `--editor --quit` once populates
+        # `.godot/global_script_class_cache.cfg` so the spawned
+        # processes start from a warm state.
+        shell: bash
+        run: godot --headless --editor --quit --path . || true
+
+      - name: Run E2E test suite (mode=${{ matrix.mode }})
+        working-directory: mcp-server
+        env:
+          # Surface the matrix value to the spawned Godot processes so
+          # the fixture projects can branch when needed.
+          MCP_E2E_MODE: ${{ matrix.mode }}
+        shell: bash
+        run: npm test -- test/e2e/

@@ -76,7 +76,7 @@ describe('runUnit — happy path', () => {
     expect(report).toEqual(sampleReport);
   });
 
-  it('passes -gdir and -gexit with the authoritative flag names', async () => {
+  it('passes -gdir, -gpost_run_script, and -gexit with the authoritative flag names', async () => {
     const { calls } = captureArgs();
     const spawn = fakeSpawnReturning(JSON.stringify(sampleReport), { calls });
     await runUnit({ path: 'tests/unit' }, { spawn });
@@ -86,6 +86,7 @@ describe('runUnit — happy path', () => {
       '--script',
       'addons/gut/gut_cmdln.gd',
       '-gdir=tests/unit',
+      '-gpost_run_script=res://addons/forgekit_core/testing/gut_to_test_report_hook.gd',
       '-gexit',
     ]);
   });

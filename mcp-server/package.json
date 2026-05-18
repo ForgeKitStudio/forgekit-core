@@ -25,6 +25,8 @@
         "start": "node dist/src/index.js"
     },
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "ajv": "^8.20.0",
         "ws": "^8.18.0"
     },
     "devDependencies": {

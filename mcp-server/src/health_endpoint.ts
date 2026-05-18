@@ -1,13 +1,19 @@
 /**
- * MCP health endpoint HTTP server.
+ * MCP health endpoint HTTP server (v0.10.0 schema).
  *
  * Binds the first free TCP port in `HEALTH_RANGE` (6040-6049) on
  * `127.0.0.1` and exposes four read-only routes:
  *
- *   GET /health           — `{status, checks: {editor, runtime, cli}}`
- *   GET /metrics          — Prometheus-style text render of the
- *                            canonical counter/histogram surface.
- *   GET /version          — `{server, core_detected, api_version}`.
+ *   GET /health           — `{status, version, uptime_s, channels:
+ *                            {editor, runtime}, profile,
+ *                            unlocked_modules, workspaces}`.
+ *   GET /version          — `{version, api_version, sdk_version,
+ *                            godot_compat, schemas_count}`.
+ *   GET /metrics          — JSON cumulative stats:
+ *                            `{requests_total, requests_by_method,
+ *                              errors_total, errors_by_code,
+ *                              dispatch_latency_p50_ms,
+ *                              dispatch_latency_p99_ms}`.
  *   GET /trace/:trace_id  — last 100 JSONL entries (across up to the
  *                            last 7 days) filtered by trace_id, sorted
  *                            by `ts` ascending.
@@ -26,6 +32,9 @@ import {
   Counter,
   Histogram,
   MetricsRegistry,
+  METRIC_REQUESTS_TOTAL,
+  METRIC_REQUESTS_ERRORS,
+  METRIC_REQUESTS_DURATION_MS,
 } from './observability/metrics.js';
 import {
   HEALTH_RANGE,
@@ -33,13 +42,37 @@ import {
 } from './port_scanner.js';
 import type { ProjectRegistry } from './projects/registry.js';
 
-/** Per-channel status summary shipped by `channelStatusProvider`. */
+/** Aggregate channel rollup status returned by `channelStatusProvider`. */
 export type ChannelName = 'ok' | 'degraded' | 'down';
 
+/** Per-channel rollup map consumed by `/health` rollup logic. */
 export interface HealthChecks {
   editor: ChannelName;
   runtime: ChannelName;
   cli: ChannelName;
+}
+
+/** Per-channel transport detail returned by `channelInfoProvider`. */
+export interface ChannelInfo {
+  connected: boolean;
+  port: number | null;
+  last_heartbeat_ms_ago: number | null;
+}
+
+/** Pair of channel infos returned together by `channelInfoProvider`. */
+export interface ChannelInfoMap {
+  editor: ChannelInfo;
+  runtime: ChannelInfo;
+}
+
+/** JSON shape returned by `/metrics`. */
+export interface MetricsSnapshot {
+  requests_total: number;
+  requests_by_method: Record<string, number>;
+  errors_total: number;
+  errors_by_code: Record<string, number>;
+  dispatch_latency_p50_ms: number;
+  dispatch_latency_p99_ms: number;
 }
 
 /** Constructor options for HealthEndpoint. */
@@ -51,17 +84,42 @@ export interface HealthEndpointOptions {
   logsDir: string;
   /** Resolves the Core git tag. Returns `"unknown"` on failure. */
   coreVersionResolver: () => Promise<string>;
-  /** Server version string, echoed by `/version`. */
+  /** Server version string, echoed by `/health.version`. */
   serverVersion: string;
-  /** Returns the current per-channel status. */
+  /** Returns the current per-channel rollup status. */
   channelStatusProvider: () => HealthChecks;
+  /**
+   * Optional per-channel transport detail used by `/health.channels`.
+   * Defaults to `connected: false, port: null, last_heartbeat_ms_ago:
+   * null` for both editor and runtime when omitted.
+   */
+  channelInfoProvider?: () => ChannelInfoMap;
+  /** Active CLI profile (`Full` / `Lite` / `Minimal` / `RPG-only`). */
+  profile?: string;
+  /** License-derived list of unlocked module ids. */
+  unlockedModules?: readonly string[];
+  /** API version exposed by `/version`. Defaults to `serverVersion`. */
+  apiVersion?: string;
+  /** SDK version label exposed by `/version`. */
+  sdkVersion?: string;
+  /** Godot compatibility tags exposed by `/version`. */
+  godotCompat?: readonly string[];
+  /** Total tool-schema count exposed by `/version`. */
+  schemasCount?: number;
+  /**
+   * Optional aggregator returning a fully-formed `MetricsSnapshot` for
+   * `/metrics`. When omitted the endpoint derives the snapshot from
+   * the `MetricsRegistry` canonical metrics so the contract is
+   * satisfied even before the dispatcher wires its per-method/per-code
+   * tagging path.
+   */
+  metricsSnapshotProvider?: () => MetricsSnapshot;
   /** Test-only clock override. Defaults to `() => new Date()`. */
   clock?: () => Date;
   /**
    * Optional ProjectRegistry. When supplied, `/health` responses
    * gain a `workspaces: {count, active}` field summarising the
-   * registry state. Omitted-field fallback preserves backwards
-   * compatibility with callers that predate Phase 7.
+   * registry state.
    */
   registry?: ProjectRegistry;
 }
@@ -72,11 +130,18 @@ const TRACE_LOOKBACK_DAYS = 7;
 /** Maximum number of JSONL entries returned by /trace/:trace_id. */
 const TRACE_MAX_ENTRIES = 100;
 
+const DEFAULT_CHANNEL_INFO: ChannelInfo = {
+  connected: false,
+  port: null,
+  last_heartbeat_ms_ago: null,
+};
+
 export class HealthEndpoint {
   private readonly opts: HealthEndpointOptions;
   private readonly clock: () => Date;
   private server: Server | null = null;
   private port: number | null = null;
+  private startedAtMs: number | null = null;
 
   constructor(opts: HealthEndpointOptions) {
     this.opts = opts;
@@ -91,6 +156,7 @@ export class HealthEndpoint {
       this.server!.listen(port, '127.0.0.1', () => resolve());
     });
     this.port = port;
+    this.startedAtMs = this.clock().getTime();
     await this.writeActivePort(port);
   }
 
@@ -101,6 +167,7 @@ export class HealthEndpoint {
     const server = this.server;
     this.server = null;
     this.port = null;
+    this.startedAtMs = null;
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
@@ -114,7 +181,6 @@ export class HealthEndpoint {
   }
 
   private handle(req: IncomingMessage, res: ServerResponse): void {
-    // Only serve GET; everything else returns 405.
     if (req.method !== 'GET') {
       res.statusCode = 405;
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -151,17 +217,45 @@ export class HealthEndpoint {
   private serveHealth(res: ServerResponse): void {
     const checks = this.opts.channelStatusProvider();
     const status = rollupStatus(checks);
-    const body: Record<string, unknown> = { status, checks };
+    const channelInfo = this.opts.channelInfoProvider !== undefined
+      ? this.opts.channelInfoProvider()
+      : { editor: DEFAULT_CHANNEL_INFO, runtime: DEFAULT_CHANNEL_INFO };
+    const uptimeS = this.computeUptimeSeconds();
+    const body: Record<string, unknown> = {
+      status,
+      version: this.opts.serverVersion,
+      uptime_s: uptimeS,
+      channels: {
+        editor: channelInfo.editor,
+        runtime: channelInfo.runtime,
+      },
+      profile: this.opts.profile ?? 'Full',
+      unlocked_modules: [...(this.opts.unlockedModules ?? [])],
+    };
     if (this.opts.registry !== undefined) {
       const active = this.opts.registry.getActive();
       body.workspaces = {
         count: this.opts.registry.size(),
         active: active?.workspace_id ?? null,
       };
+    } else {
+      body.workspaces = { count: 0, active: null };
     }
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify(body));
+  }
+
+  private computeUptimeSeconds(): number {
+    if (this.startedAtMs === null) {
+      return 0;
+    }
+    const nowMs = this.clock().getTime();
+    const deltaMs = nowMs - this.startedAtMs;
+    if (deltaMs <= 0) {
+      return 0;
+    }
+    return Math.floor(deltaMs / 1000);
   }
 
   // -------------------------------------------------------------------
@@ -169,27 +263,35 @@ export class HealthEndpoint {
   // -------------------------------------------------------------------
 
   private serveMetrics(res: ServerResponse): void {
-    const lines: string[] = [];
-    for (const [name, counter] of this.opts.metrics.listCounters()) {
-      const safeName = promMetricName(name);
-      lines.push(`# HELP ${safeName} ${name}`);
-      lines.push(`# TYPE ${safeName} counter`);
-      lines.push(`${safeName} ${counter.value()}`);
-    }
-    for (const [name, histogram] of this.opts.metrics.listHistograms()) {
-      const safeName = promMetricName(name);
-      const snap = histogram.snapshot();
-      lines.push(`# HELP ${safeName} ${name}`);
-      lines.push(`# TYPE ${safeName} histogram`);
-      lines.push(`${safeName}_count ${snap.count}`);
-      lines.push(`${safeName}_sum ${snap.sum}`);
-      lines.push(`${safeName}{quantile="0.5"} ${snap.p50}`);
-      lines.push(`${safeName}{quantile="0.95"} ${snap.p95}`);
-      lines.push(`${safeName}{quantile="0.99"} ${snap.p99}`);
-    }
+    const snapshot = this.opts.metricsSnapshotProvider !== undefined
+      ? this.opts.metricsSnapshotProvider()
+      : this.deriveMetricsSnapshot();
     res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain; version=0.0.4');
-    res.end(lines.join('\n') + '\n');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify(snapshot));
+  }
+
+  private deriveMetricsSnapshot(): MetricsSnapshot {
+    const counters = new Map(this.opts.metrics.listCounters());
+    const histograms = new Map(this.opts.metrics.listHistograms());
+    const requestsTotal = counters.get(METRIC_REQUESTS_TOTAL)?.value() ?? 0;
+    const errorsTotal = counters.get(METRIC_REQUESTS_ERRORS)?.value() ?? 0;
+    const histogram = histograms.get(METRIC_REQUESTS_DURATION_MS);
+    let p50 = 0;
+    let p99 = 0;
+    if (histogram !== undefined) {
+      const snap = histogram.snapshot();
+      p50 = snap.p50;
+      p99 = snap.p99;
+    }
+    return {
+      requests_total: requestsTotal,
+      requests_by_method: {},
+      errors_total: errorsTotal,
+      errors_by_code: {},
+      dispatch_latency_p50_ms: p50,
+      dispatch_latency_p99_ms: p99,
+    };
   }
 
   // -------------------------------------------------------------------
@@ -203,15 +305,17 @@ export class HealthEndpoint {
     } catch {
       coreDetected = 'unknown';
     }
+    const body = {
+      version: this.opts.serverVersion,
+      api_version: this.opts.apiVersion ?? this.opts.serverVersion,
+      sdk_version: this.opts.sdkVersion ?? 'unknown',
+      godot_compat: [...(this.opts.godotCompat ?? [])],
+      schemas_count: this.opts.schemasCount ?? 0,
+      core_detected: coreDetected,
+    };
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.end(
-      JSON.stringify({
-        server: this.opts.serverVersion,
-        core_detected: coreDetected,
-        api_version: this.opts.serverVersion,
-      }),
-    );
+    res.end(JSON.stringify(body));
   }
 
   // -------------------------------------------------------------------
@@ -276,10 +380,7 @@ export class HealthEndpoint {
         existing = parsed as Record<string, unknown>;
       }
     } catch {
-      // Missing / malformed — fall back to a fresh object. We'll only
-      // write the `health` key; sibling keys (editor, runtime,
-      // visualizer) are only echoed when the pre-existing file had
-      // them.
+      // Missing / malformed — fall back to a fresh object.
     }
     existing.health = port;
     const suffix = randomBytes(4).toString('hex');
@@ -312,11 +413,6 @@ function rollupStatus(checks: HealthChecks): ChannelName {
     return 'degraded';
   }
   return 'ok';
-}
-
-/** Translate a ForgeKit metric name to a Prometheus-safe identifier. */
-function promMetricName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
 function dateStamp(d: Date): string {

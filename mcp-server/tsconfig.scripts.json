@@ -13,7 +13,8 @@
   "include": [
     "src/**/*",
     "scripts/git-hooks/**/*",
-    "scripts/ci/**/*"
+    "scripts/ci/**/*",
+    "scripts/validate-error-codes.ts"
   ],
   "exclude": [
     "dist",

@@ -89,6 +89,86 @@ paid **ForgeKit RPG Module**.
 10. Call `crafting.execute("iron_ingot")` from the same MCP client and watch
     the item appear in the inventory.
 
+### Connect an MCP client over stdio
+
+Most LLM clients (Claude Desktop, Cursor, Kiro, Antigravity) speak MCP over
+stdio. Run the server once to confirm the binary is reachable, then point
+the client at it through its MCP config file. The full list of clients and
+their config snippets lives in
+[`docs/mcp_api.md`](./docs/mcp_api.md#connecting-to-forgekit-mcp-server) and
+in the [`connecting_mcp_clients.md`](./docs/SKILLS/connecting_mcp_clients.md)
+SKILL pack; the Claude Desktop snippet below is the canonical "first
+connection" template.
+
+```sh
+npx -y @forgekitstudio/core-mcp --stdio --profile Full
+```
+
+```
+[license] unlocked modules: [forgekit_rpg]
+[mcp] stdio bridge ready (profile=Full, tools=271)
+```
+
+Add the entry below to
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+or `%APPDATA%\Claude\claude_desktop_config.json` (Windows), then restart
+Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "forgekit": {
+      "command": "npx",
+      "args": ["-y", "@forgekitstudio/core-mcp", "--stdio", "--profile", "Full"]
+    }
+  }
+}
+```
+
+Once the client is connected, ask it to list ForgeKit tools. Behind the
+scenes the client issues `tools/list`; the server replies with one MCP
+`Tool` record per active tool. The first entries in a `Full` profile
+response look like this (271 entries in total at v0.9.x):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "project.info",
+        "description": "Returns a stable summary of a Godot project: name, godot_version, api_version, modules_count, root_path.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectRoot": { "type": "string", "minLength": 1 },
+            "apiVersion": { "type": "string", "minLength": 1 }
+          },
+          "required": ["projectRoot", "apiVersion"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "project.list_modules",
+        "description": "Returns every `forgekit_*` module under the project with manifest fields (id, version, license_id, core_min_version, source_repo, enabled).",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "projectRoot": { "type": "string", "minLength": 1 } },
+          "required": ["projectRoot"],
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}
+```
+
+`Lite` (~194), `Minimal` (~21), and `RPG-only` (~98) replies have the same
+shape with a smaller `tools` array. Pick the profile that matches your
+client's context budget; switch profiles by relaunching the server with a
+different `--profile` flag.
+
 ## Updating
 
 ForgeKit ships three independent update channels, one per product.

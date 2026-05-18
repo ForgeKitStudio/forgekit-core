@@ -162,42 +162,119 @@ function slugify(heading: string): string {
  * the heading whose slug equals `headingId`. A "section" runs from its
  * heading to the next heading of the same or lower depth.
  *
- * Strategy: walk the diff line-by-line, track the most recent heading seen
- * in context / added lines, and when we encounter a change line (`+` or
- * `-`) assume the currently-open section is being touched.
+ * Strategy: parse the post-image of the staged file once to compute a
+ * `[startLine, endLine]` range for each heading, then walk the unified
+ * diff's hunk headers (`@@ -... +newStart[,newCount] @@`) to derive line
+ * ranges in the post-image. The section is touched when any hunk range
+ * overlaps the target heading's range.
+ *
+ * The `fileText` argument is the staged (post-image) content of the file
+ * the diff applies to. It is required because `git diff --cached -U0`
+ * returns hunks with zero context lines, so the heading itself is usually
+ * absent from the diff and a diff-only walker cannot tell which section a
+ * change belongs to.
  */
-export function anchorWasTouched(diffText: string, headingId: string): boolean {
+export function anchorWasTouched(
+  diffText: string,
+  headingId: string,
+  fileText: string,
+): boolean {
   if (diffText.length === 0) {
     return false;
   }
-  let currentSlug: string | null = null;
-  let inHunk = false;
-  for (const rawLine of diffText.split(/\r?\n/)) {
-    if (rawLine.startsWith('@@')) {
-      inHunk = true;
-      currentSlug = null;
-      continue;
-    }
-    if (!inHunk) {
-      continue;
-    }
-    // Strip the leading ' ', '+' or '-' marker for content inspection.
-    const marker = rawLine[0] ?? '';
-    const content = rawLine.slice(1);
-    const headingMatch = /^(#+)\s+(.+?)\s*$/.exec(content);
-    if (headingMatch !== null) {
-      currentSlug = slugify(headingMatch[2]);
-      // The heading line itself being added counts as touching the section.
-      if ((marker === '+' || marker === '-') && currentSlug === headingId) {
-        return true;
-      }
-      continue;
-    }
-    if ((marker === '+' || marker === '-') && currentSlug === headingId) {
+  const range = findHeadingRange(fileText, headingId);
+  if (range === null) {
+    return false;
+  }
+  for (const hunk of parsePostImageRanges(diffText)) {
+    if (hunk.start <= range.end && hunk.end >= range.start) {
       return true;
     }
   }
   return false;
+}
+
+/** Inclusive `[start, end]` line range for a heading section. */
+interface HeadingRange {
+  /** 1-based line number of the heading itself. */
+  readonly start: number;
+  /** 1-based line number of the last line in the section (inclusive). */
+  readonly end: number;
+}
+
+/**
+ * Locate the inclusive line range of the heading whose slug equals
+ * `headingId` inside `fileText`. The section runs from the heading line
+ * (inclusive) to either the line before the next heading of the same or
+ * shallower depth, or the last line of the file.
+ *
+ * Returns `null` when no heading with the requested slug is found.
+ */
+function findHeadingRange(
+  fileText: string,
+  headingId: string,
+): HeadingRange | null {
+  const lines = fileText.split(/\r?\n/);
+  let headingLine = -1;
+  let headingDepth = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^(#+)\s+(.+?)\s*$/.exec(lines[i]);
+    if (match === null) {
+      continue;
+    }
+    if (slugify(match[2]) === headingId) {
+      headingLine = i;
+      headingDepth = match[1].length;
+      break;
+    }
+  }
+  if (headingLine < 0) {
+    return null;
+  }
+  let endLine = lines.length - 1;
+  for (let i = headingLine + 1; i < lines.length; i++) {
+    const match = /^(#+)\s+(.+?)\s*$/.exec(lines[i]);
+    if (match !== null && match[1].length <= headingDepth) {
+      endLine = i - 1;
+      break;
+    }
+  }
+  return { start: headingLine + 1, end: endLine + 1 };
+}
+
+/** Inclusive `[start, end]` line range affected by a hunk in the post-image. */
+interface HunkRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+/**
+ * Parse `@@ -... +newStart[,newCount] @@` headers from a unified diff and
+ * return the inclusive line ranges they affect in the post-image.
+ *
+ * A `+0,0` hunk (pure deletion at end of file) is reported as a zero-width
+ * range anchored at `newStart` so that it cannot overlap any real section.
+ * For non-zero counts the range is `[newStart, newStart + newCount - 1]`.
+ */
+function parsePostImageRanges(diffText: string): HunkRange[] {
+  const ranges: HunkRange[] = [];
+  for (const line of diffText.split(/\r?\n/)) {
+    const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (match === null) {
+      continue;
+    }
+    const start = Number(match[1]);
+    const count = match[2] === undefined ? 1 : Number(match[2]);
+    if (count === 0) {
+      // Pure deletion — anchor a zero-width range that won't overlap a
+      // section unless the section itself is zero-width, which never
+      // happens for a real heading.
+      ranges.push({ start, end: start - 1 });
+      continue;
+    }
+    ranges.push({ start, end: start + count - 1 });
+  }
+  return ranges;
 }
 
 /**
@@ -287,6 +364,26 @@ async function readDiffForFile(io: HookIo, file: string): Promise<string> {
 }
 
 /**
+ * Read the staged (post-image) content of `file` from the index.
+ *
+ * `git show :<file>` returns the blob currently staged for the next
+ * commit, which is what we need when deciding which heading section a
+ * `git diff --cached` hunk falls inside. Returns an empty string on
+ * failure (e.g. the file is freshly added but unreadable for any reason)
+ * so the caller can degrade gracefully without crashing the hook.
+ */
+async function readStagedFileContent(
+  io: HookIo,
+  file: string,
+): Promise<string> {
+  try {
+    return await io.exec('git', ['show', `:${file}`]);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * End-to-end driver for the pre-commit hook. See file header for behaviour.
  */
 export async function runHook(io: HookIo): Promise<void> {
@@ -333,8 +430,10 @@ export async function runHook(io: HookIo): Promise<void> {
     return;
   }
 
-  // Cache the diff for every anchor file so we only ask Git once per file.
+  // Cache the diff and staged content for every anchor file so we only ask
+  // Git once per file.
   const diffCache = new Map<string, string>();
+  const stagedContentCache = new Map<string, string>();
   const stale: StaleAnchor[] = [];
   for (const entry of required) {
     const { file: anchorFile, slug } = splitAnchor(entry.required_anchor);
@@ -347,7 +446,12 @@ export async function runHook(io: HookIo): Promise<void> {
       diff = await readDiffForFile(io, anchorFile);
       diffCache.set(anchorFile, diff);
     }
-    if (!anchorWasTouched(diff, slug)) {
+    let stagedContent = stagedContentCache.get(anchorFile);
+    if (stagedContent === undefined) {
+      stagedContent = await readStagedFileContent(io, anchorFile);
+      stagedContentCache.set(anchorFile, stagedContent);
+    }
+    if (!anchorWasTouched(diff, slug, stagedContent)) {
       stale.push(entry);
     }
   }

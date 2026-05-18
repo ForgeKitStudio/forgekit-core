@@ -296,6 +296,45 @@ import. Keep the two copies byte-for-byte aligned — the `forgekit-rpg`
 shell script is the canonical runtime and this file is the canonical
 test subject.
 
+## MCP transport
+
+`mcp-server/src/index.ts::bootstrapServer` selects one of three runtime
+modes based on the parsed `CliOptions`:
+
+- **stdio mode (`--stdio`).** Boots an MCP `Server` over
+  `StdioServerTransport` from `@modelcontextprotocol/sdk`. Stdin reads
+  newline-delimited JSON-RPC requests from the LLM client; stdout is
+  reserved for JSON-RPC responses and notifications. Every diagnostic
+  line goes to stderr (the readiness banner is
+  `[mcp] stdio bridge ready (profile=<Profile>, tools=<count>)`); never
+  write logs to stdout in this mode or the client framing breaks. The
+  in-process `ChannelRouter` runs the CLI executor for `cli`-channel
+  tools; the `editor` and `runtime` channels report
+  `channel-unavailable` (`-32000`) until the Godot bridges are
+  connected. The server resolves on stdin close or `SIGTERM`/`SIGINT`,
+  closing the SDK transport on the way out.
+- **headless mode (default).** Boots the health endpoint on the first
+  free TCP port in `6040-6049`, registers a SIGTERM/SIGINT lifecycle,
+  and blocks until shutdown. No stdio framing. This is the mode
+  long-running operator processes (CI, release pipelines, monitoring
+  dashboards) run under; tools are still callable through the MCP
+  bridges, but there is no client transport on the local process.
+- **smoke mode (`--smoke`).** Prints
+  `[@forgekitstudio/core-mcp] skeleton — stdio=<bool>, profile=<Profile>, logLevel=<level>.`
+  to stderr and resolves immediately. Preserved for QA tooling that
+  only checked for the skeleton line.
+
+Stdout is sacred in stdio mode: `runStdioMode` injects the writable
+stream into the `StdioServerTransport` constructor and the SDK assumes
+no other writer touches it. Never `console.log` from any code path
+that runs under stdio mode; the dispatcher logger and the JSONL logger
+both target stderr / on-disk files for that reason.
+
+The CLI accepts `--stdio`, `--smoke`, `--profile`, `--mcp-log-level`,
+and `--license-dir`. `parseCliArgs` normalises the input and rejects
+values outside the allowed sets with `UNKNOWN_PROFILE` (`-32025`) for
+`--profile` and equivalent value-set errors for the other flags.
+
 ## Observability
 
 The MCP server exposes structured logs, a trace id that follows every

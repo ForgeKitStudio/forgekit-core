@@ -311,6 +311,27 @@ function buildAnchorDiff(file: string, touchedSlugs: ReadonlySet<string>): strin
   return lines.join('\n');
 }
 
+/**
+ * Build the post-image content of an anchor file so that each touched slug
+ * has its heading line at the same line number used in the matching hunk
+ * header inside {@link buildAnchorDiff}. The Context Commits enforcer
+ * needs the staged file content to compute heading line ranges, so the
+ * mock content must be aligned with the synthetic diff.
+ */
+function buildAnchorContent(touchedSlugs: ReadonlySet<string>): string {
+  const lines: string[] = [];
+  let start = 10;
+  for (const slug of touchedSlugs) {
+    while (lines.length < start - 1) {
+      lines.push(`filler line ${lines.length + 1}`);
+    }
+    lines.push(`## ${slug}`);
+    lines.push(`Updated ${slug} context line.`);
+    start += 10;
+  }
+  return lines.join('\n');
+}
+
 interface MockHandles {
   io: HookIo;
   stderrChunks: string[];
@@ -329,17 +350,20 @@ function makeIo(
     ...(scenario.stagedCursor ? ['.cursorrules'] : []),
   ];
   const diffs: Record<string, string> = {};
+  const stagedContents: Record<string, string> = {};
   for (const codeFile of scenario.codeFiles) {
     diffs[codeFile] = `diff --git a/${codeFile} b/${codeFile}\n`;
   }
   if (scenario.stagedClaude) {
     diffs['CLAUDE.md'] = buildAnchorDiff('CLAUDE.md', scenario.touchedInClaude);
+    stagedContents['CLAUDE.md'] = buildAnchorContent(scenario.touchedInClaude);
   }
   if (scenario.stagedCursor) {
     diffs['.cursorrules'] = buildAnchorDiff(
       '.cursorrules',
       scenario.touchedInCursor,
     );
+    stagedContents['.cursorrules'] = buildAnchorContent(scenario.touchedInCursor);
   }
 
   const stderrChunks: string[] = [];
@@ -364,6 +388,9 @@ function makeIo(
           return diffs[args[sep + 1]] ?? '';
         }
         return '';
+      }
+      if (args[0] === 'show' && typeof args[1] === 'string' && args[1].startsWith(':')) {
+        return stagedContents[args[1].slice(1)] ?? '';
       }
       if (args[0] === 'config' && args[1] === 'user.name') {
         return `${author}\n`;

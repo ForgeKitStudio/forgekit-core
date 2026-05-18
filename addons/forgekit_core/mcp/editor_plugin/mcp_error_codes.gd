@@ -92,6 +92,17 @@ const CONVENTIONAL_COMMITS_FORMAT_VIOLATION_MESSAGE: String = "CONVENTIONAL_COMM
 const PR_TEMPLATE_INCOMPLETE: int = -32014
 const PR_TEMPLATE_INCOMPLETE_MESSAGE: String = "PR_TEMPLATE_INCOMPLETE"
 
+## Tool surfaced by `tools/list` was filtered out at `tools/call` time
+## because the active license set does not unlock the module that owns
+## it (or the module licence expired between `tools/list` and the call).
+const PROFILE_TOOL_FILTERED: int = -32024
+const PROFILE_TOOL_FILTERED_MESSAGE: String = "PROFILE_TOOL_FILTERED"
+
+## `--profile` flag (or the equivalent `plugin_config.tres` field) carries
+## a name that is not declared in `profiles.json`.
+const UNKNOWN_PROFILE: int = -32025
+const UNKNOWN_PROFILE_MESSAGE: String = "UNKNOWN_PROFILE"
+
 
 # ---------------------------------------------------------------------------
 # Factory
@@ -133,6 +144,8 @@ static func _message_for(code: int) -> String:
 		CONTEXT_FILE_STALE: return CONTEXT_FILE_STALE_MESSAGE
 		CONVENTIONAL_COMMITS_FORMAT_VIOLATION: return CONVENTIONAL_COMMITS_FORMAT_VIOLATION_MESSAGE
 		PR_TEMPLATE_INCOMPLETE: return PR_TEMPLATE_INCOMPLETE_MESSAGE
+		PROFILE_TOOL_FILTERED: return PROFILE_TOOL_FILTERED_MESSAGE
+		UNKNOWN_PROFILE: return UNKNOWN_PROFILE_MESSAGE
 		_: return "UNKNOWN_ERROR"
 
 
@@ -162,5 +175,9 @@ static func _default_suggestion(code: int) -> String:
 			return "Rewrite the commit message as '<type>(<scope>): <subject>' per the Conventional Commits 1.0 spec."
 		PR_TEMPLATE_INCOMPLETE:
 			return "Populate the required PR template sections (Test Report, Gameplay Scenarios, Affected MCP Tools, Breaking Changes) before requesting review."
+		PROFILE_TOOL_FILTERED:
+			return "Activate the required module license or switch to a profile that exposes this tool, then call tools/list again."
+		UNKNOWN_PROFILE:
+			return "Pass --profile with one of full|lite|minimal|rpg-only or remove the flag to use the default profile."
 		_:
 			return "Consult the MCP error-code documentation for remediation steps."

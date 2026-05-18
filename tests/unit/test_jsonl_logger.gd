@@ -210,3 +210,71 @@ func test_hoists_workspace_id_to_top_level() -> void:
 	var data: Dictionary = entry.get("data", {}) as Dictionary
 	assert_true(data.has("payload_hint"), "Non-reserved keys stay nested under data")
 	assert_false(data.has("workspace_id"), "Reserved keys must not leak into data")
+
+
+
+# ---------------------------------------------------------------------------
+# 7) set_trace_context: subsequent log() calls inherit the bound
+#    trace_id and span_id without the caller having to thread them
+#    through every payload.
+# ---------------------------------------------------------------------------
+
+func test_set_trace_context_propagates_to_subsequent_log_calls() -> void:
+	var logger: Object = _new_logger(&"info")
+	_set_clock(logger, "2026-05-16T12:00:00.000Z")
+
+	logger.set_trace_context("aabbccdd", "1234")
+	logger.log(&"info", &"runtime_bridge", {"method": "scene.open"})
+
+	var file_path: String = _scratch_base.path_join("runtime_bridge/2026-05-16.jsonl")
+	var lines: Array = _read_lines(file_path)
+	assert_eq(lines.size(), 1, "One line expected")
+	var entry: Dictionary = lines[0] as Dictionary
+	assert_eq(String(entry.get("trace_id", "")), "aabbccdd",
+		"trace_id from set_trace_context must be hoisted to top-level")
+	assert_eq(String(entry.get("span_id", "")), "1234",
+		"span_id from set_trace_context must be hoisted to top-level")
+	assert_eq(String(entry.get("method", "")), "scene.open",
+		"explicit fields in the data payload must still be hoisted")
+
+
+func test_set_trace_context_is_overridable_by_explicit_data_fields() -> void:
+	# Explicit `trace_id` / `span_id` in the per-call payload must win
+	# over the bound context so the caller can override the inherited
+	# trace for a single line (e.g. a sub-span emitted by a tool).
+	var logger: Object = _new_logger(&"info")
+	_set_clock(logger, "2026-05-16T12:00:00.000Z")
+
+	logger.set_trace_context("aabbccdd", "1234")
+	logger.log(&"info", &"runtime_bridge", {
+		"trace_id": "11112222",
+		"span_id": "9999",
+		"method": "scene.open",
+	})
+
+	var file_path: String = _scratch_base.path_join("runtime_bridge/2026-05-16.jsonl")
+	var lines: Array = _read_lines(file_path)
+	var entry: Dictionary = lines[0] as Dictionary
+	assert_eq(String(entry.get("trace_id", "")), "11112222",
+		"explicit trace_id in payload must override bound trace context")
+	assert_eq(String(entry.get("span_id", "")), "9999",
+		"explicit span_id in payload must override bound trace context")
+
+
+func test_set_trace_context_with_empty_strings_clears_binding() -> void:
+	# Passing empty strings clears the inherited context so callers can
+	# explicitly disable propagation between requests.
+	var logger: Object = _new_logger(&"info")
+	_set_clock(logger, "2026-05-16T12:00:00.000Z")
+
+	logger.set_trace_context("aabbccdd", "1234")
+	logger.set_trace_context("", "")
+	logger.log(&"info", &"runtime_bridge", {"method": "scene.open"})
+
+	var file_path: String = _scratch_base.path_join("runtime_bridge/2026-05-16.jsonl")
+	var lines: Array = _read_lines(file_path)
+	var entry: Dictionary = lines[0] as Dictionary
+	assert_false(entry.has("trace_id"),
+		"Cleared context must not surface trace_id on the line")
+	assert_false(entry.has("span_id"),
+		"Cleared context must not surface span_id on the line")

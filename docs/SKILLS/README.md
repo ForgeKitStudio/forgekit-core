@@ -20,6 +20,7 @@ which reduces guesswork and makes tool sequencing more reliable.
 | [`debugging_failing_tests.md`](./debugging_failing_tests.md) | Investigate a failing GUT / property test and propose a fix. |
 | [`self_healing_tres.md`](./self_healing_tres.md) | Detect and repair corrupted or outdated `.tres` resources. |
 | [`module_licensing.md`](./module_licensing.md) | Inspect, activate, and verify module licenses (e.g. `forgekit_rpg`). |
+| [`connecting_mcp_clients.md`](./connecting_mcp_clients.md) | Register `@forgekitstudio/core-mcp` with Claude Desktop, Cursor, Kiro, or Antigravity, then walk through `tools/list` → `tools/call`. |
 
 Additional skills may be added in later phases. Contributions that follow the
 format described below are welcome through pull requests to
@@ -88,7 +89,8 @@ phase; until then, copy the files manually.
 ## Status
 
 As of Phase 6B all four skill files are populated with full scenario
-content targeting `api_version: 0.7.x`:
+content targeting `api_version: 0.7.x`. Phase 7 (`connecting_mcp_clients.md`)
+targets `api_version: 0.9.x`:
 
 | File | Status |
 |------|--------|
@@ -96,3 +98,4 @@ content targeting `api_version: 0.7.x`:
 | `debugging_failing_tests.md` | Populated. |
 | `self_healing_tres.md` | Populated. |
 | `module_licensing.md` | Populated. |
+| `connecting_mcp_clients.md` | Populated. |

@@ -26,6 +26,9 @@ import {
   resolveUserLicenseDir,
 } from './license_directory.js';
 
+/** Default interval (ms) at which `watchLicenseDir` polls the directory. */
+const DEFAULT_WATCH_POLL_MS = 250;
+
 /** Shape of a persisted license record (one file per module id). */
 export interface LicenseRecord {
   readonly license_id: string;
@@ -127,25 +130,25 @@ function coerceLicenseRecord(value: unknown): LicenseRecord | null {
 
 /** Map from module id to the set of tool modules it unlocks. */
 const MODULE_ID_TO_UNLOCKED: Readonly<Record<string, ReadonlyArray<ToolModule>>> =
-  {
-    forgekit_rpg: [
-      'combat',
-      'crafting',
-      'inventory',
-      'stats',
-      'effects',
-      'magic',
-      'equipment',
-      'progression',
-      'enemies',
-      'loot',
-      'spawner',
-      'chests',
-      'npc',
-      'dialog',
-      'vendor',
-    ],
-  };
+{
+  forgekit_rpg: [
+    'combat',
+    'crafting',
+    'inventory',
+    'stats',
+    'effects',
+    'magic',
+    'equipment',
+    'progression',
+    'enemies',
+    'loot',
+    'spawner',
+    'chests',
+    'npc',
+    'dialog',
+    'vendor',
+  ],
+};
 
 /**
  * Derives the set of tool modules that should be additionally exposed
@@ -217,4 +220,156 @@ export async function resolveLicenseDir(
   }
 
   return resolveUserLicenseDir({ platform, env, homedir, projectName });
+}
+
+
+/** Listener invoked whenever the contents of the license directory change. */
+export type LicenseDirChangeListener = () => void | Promise<void>;
+
+/** Handle returned by `watchLicenseDir` so callers can detach. */
+export interface LicenseDirWatcher {
+  /** Stop watching and release any underlying resources. */
+  close(): Promise<void>;
+}
+
+export interface WatchLicenseDirOptions {
+  /**
+   * Polling interval in milliseconds. The watcher uses a directory-listing
+   * polling strategy so it works uniformly across platforms (macOS, Linux,
+   * Windows) and copes with the directory not existing yet. Defaults to
+   * 250 ms — small enough to feel instantaneous in interactive sessions
+   * but large enough to keep CPU cost negligible.
+   */
+  readonly pollMs?: number;
+  /** Optional logger surface used for transient errors during polling. */
+  readonly logger?: LicenseLogger;
+}
+
+/**
+ * Watches `licenseDir` for changes to any `*.key` file (creation,
+ * deletion, content change) and invokes `listener` on every change.
+ *
+ * The watcher uses periodic directory listing rather than `fs.watch`
+ * because:
+ *   - `fs.watch` rejects when the target directory does not yet exist;
+ *     callers expect the watcher to start before the first license
+ *     activation has happened.
+ *   - `fs.watch` semantics differ between macOS, Linux, and Windows in
+ *     ways that make the rapid-create-then-delete sequence used by the
+ *     test suite unreliable.
+ *
+ * The listener fires when any of these change between polls:
+ *   - the set of `*.key` filenames present in the directory
+ *   - the size of any `*.key` file
+ *   - the modification time of any `*.key` file
+ *
+ * The listener never blocks the polling loop: rejected promises are
+ * caught and reported through `options.logger.warn` (when supplied).
+ */
+export async function watchLicenseDir(
+  licenseDir: string,
+  listener: LicenseDirChangeListener,
+  options: WatchLicenseDirOptions = {},
+): Promise<LicenseDirWatcher> {
+  const pollMs = options.pollMs ?? DEFAULT_WATCH_POLL_MS;
+  const logger = options.logger;
+
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let snapshot = await snapshotKeyFiles(licenseDir);
+
+  const tick = async (): Promise<void> => {
+    if (stopped) {
+      return;
+    }
+    try {
+      const next = await snapshotKeyFiles(licenseDir);
+      if (!snapshotsEqual(snapshot, next)) {
+        snapshot = next;
+        try {
+          await listener();
+        } catch (err) {
+          logger?.warn(
+            `[license] watcher listener threw: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    } catch (err) {
+      logger?.warn(
+        `[license] watcher poll failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      if (!stopped) {
+        timer = setTimeout(() => {
+          void tick();
+        }, pollMs);
+      }
+    }
+  };
+
+  timer = setTimeout(() => {
+    void tick();
+  }, pollMs);
+
+  return {
+    async close(): Promise<void> {
+      stopped = true;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    },
+  };
+}
+
+interface KeyFileFingerprint {
+  readonly size: number;
+  readonly mtimeMs: number;
+}
+
+type KeySnapshot = ReadonlyMap<string, KeyFileFingerprint>;
+
+async function snapshotKeyFiles(licenseDir: string): Promise<KeySnapshot> {
+  let entries: string[];
+  try {
+    entries = await readdir(licenseDir);
+  } catch {
+    return new Map();
+  }
+
+  const snapshot = new Map<string, KeyFileFingerprint>();
+  for (const entry of entries) {
+    if (!entry.endsWith('.key')) {
+      continue;
+    }
+    const filePath = join(licenseDir, entry);
+    try {
+      const s = await stat(filePath);
+      if (!s.isFile()) {
+        continue;
+      }
+      snapshot.set(entry, { size: s.size, mtimeMs: s.mtimeMs });
+    } catch {
+      // File disappeared between readdir and stat; skip and let the
+      // next poll catch up.
+      continue;
+    }
+  }
+  return snapshot;
+}
+
+function snapshotsEqual(a: KeySnapshot, b: KeySnapshot): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const [name, fp] of a) {
+    const other = b.get(name);
+    if (other === undefined) {
+      return false;
+    }
+    if (other.size !== fp.size || other.mtimeMs !== fp.mtimeMs) {
+      return false;
+    }
+  }
+  return true;
 }
